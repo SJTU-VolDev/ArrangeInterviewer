@@ -1,2 +1,3 @@
-data/
+data/*.xlsx
 __pycache__/
+result/*.xlsx

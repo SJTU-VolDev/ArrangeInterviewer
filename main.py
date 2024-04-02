@@ -1,7 +1,9 @@
 from init import init
 from model import InterviewTime, Interviewee, Interviewer
-from methods import arrangeInterviewer
+from methods import arrangeInterviewerAndStaff
+from output import outputInterviewerAndStaff
 if __name__ == "__main__":
     init()
-    arrangeInterviewer()
+    arrangeInterviewerAndStaff()
+    outputInterviewerAndStaff()
     print("Done.")

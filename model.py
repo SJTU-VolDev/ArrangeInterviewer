@@ -12,7 +12,7 @@ class InterviewTime:
     def __init__(self, now, end, positions):
         self.datetime = [now, end]
         self.positions = positions
-        self.datetime_str = now.strftime("%Y-%m-%d %H:%M:%S") + "-" + end.strftime("%Y-%m-%d %H:%M:%S")
+        self.datetime_str = now.strftime("%Y.%m.%d %H:%M:%S") + "-" + end.strftime("%Y.%m.%d %H:%M:%S")
         self.interviewers = []
         self.interviewees = []
 
@@ -53,9 +53,13 @@ class Interviewer:
     存储一个面试官的姓名、有空时间、面试时间
     '''
     name = ''
-    available_time = []
+    available_time = [] #面试官有空的时间段
     interview_time = []
+    staff_available_time = [] #场务有空的时间段
+    staff_time = [] #场务的时间段
     def __init__(self, name):
         self.name = name
         self.available_time = []
         self.interview_time = []
+        self.staff_available_time = []
+        self.staff_time = []

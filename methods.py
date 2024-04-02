@@ -33,7 +33,18 @@ def checkTimeConflict(interviewer, t):
 #             # 否则，初始化计数为1
 #             datetime_count[datetime_key] = 1
 #     return datetime_count
-
+def checkStaffTimeConflict(interviewer, t):
+    if len(interviewer.interview_time) > 0:
+        for y in interviewer.interview_time:
+            time_format = "%Y.%m.%d %H:%M:%S"
+            begin = datetime.strptime(y.interviewTime.split('-')[0],time_format)
+            end = datetime.strptime(y.interviewTime.split('-')[1],time_format)
+            if begin >= t[0] and end <= t[1]:
+                return False
+    for x in interviewer.staff_available_time:
+        if x[0] <= t[0] and x[1] >= t[1]:
+            return True
+    return False
 def arrangeInterviewer():
     '''
     为面试官安排面试时段
@@ -75,6 +86,7 @@ def arrangeInterviewer():
             interviewer = interviewers[i]
             position = positions[i % len(positions)]
             interviewer.interview_time.append(Interviewer_interviewtime(interviewtime.datetime_str, position))
+
     
     #输出结果
     # for x in InterviewerList:
@@ -82,9 +94,57 @@ def arrangeInterviewer():
     #     for y in x.interview_time:
     #         print(y.interviewTime, y.position)
     #     print()
-            
+def arrangeStaff():
+    '''
+    为场务安排时间段
+    '''
+    with open(r'data\config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
+    G = nx.DiGraph()
+    source = "source"
+    sink = "sink"
+    for x in InterviewerList:
+        if len(x.interview_time) >= int(config['面试官场次上限']):
+            continue
+        G.add_edge(source, x.name, capacity=int(config['面试官场次上限']) - len(x.interview_time)) #限制场务的场次数
+        for t in InterviewTimeList:
+            G.add_edge(t.datetime_str,sink,capacity=int(config['单场场务人数'])) #限制时间段的场务数
+            if checkStaffTimeConflict(x, t.datetime):
+                G.add_edge(x.name,t.datetime_str,capacity=1) #场务有空则可以排入
     
-    
+    flow_value,flowResult = nx.maximum_flow(G, source, sink)#最大流算法
+    #print(flowResult)
+    to_add = {} #每个时间段有多少场务可供分配
+    for u,v in G.edges():
+            #print(u,v,flowResult[u][v])
+            if u != source and v != sink and flowResult[u][v] == 1:
+                interviewer = [x for x in InterviewerList if x.name == u][0]
+                # interviewer.interview_time.append(v)
+                if v in to_add:
+                    to_add[v].append(interviewer)
+                else:
+                    to_add[v] = [interviewer]
+    for t, interviewers in to_add.items():
+        #print(t, interviewers)
+        interviewtime = [x for x in InterviewTimeList if x.datetime_str == t][0]
+        for i in range(len(interviewers)):
+            interviewer = interviewers[i]
+            interviewer.staff_time.append(interviewtime.datetime_str)
+
+def arrangeInterviewerAndStaff():
+    '''
+    为面试官和场务安排时间段
+    '''
+    arrangeInterviewer()
+    arrangeStaff()
+    #输出结果
+    # for x in InterviewerList:
+    #     print(x.name)
+    #     print("面试时间段：")
+    #     for y in x.interview_time:
+    #         print(y.interviewTime, y.position)
+    #     print("场务时间段：")
+    #     print(x.staff_time)
             
 
 
