@@ -1,0 +1,3 @@
+InterviewTimeList = []
+InterviewerList = []
+IntervieweeList = []
