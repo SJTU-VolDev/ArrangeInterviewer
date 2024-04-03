@@ -16,13 +16,14 @@ def splitTime():
         totTime = json.load(file)
     time_format = '%Y.%m.%d %H:%M'
     for x in totTime['面试时间段']:
+        staff_position = [y for y in totTime['候场教室'] if y['日期'] == x['日期']][0]['地点']
         now = datetime.strptime(str(datetime.now().year) + "." + x['日期'] + " " + x['起始时间'], time_format)
         end = datetime.strptime(str(datetime.now().year) + "." + x['日期'] + " " + x['结束时间'], time_format)
         delta = timedelta(minutes=int(config['单场时间']))
         while now + delta <= end:
             if now.hour == 17: # 17:00-18:00休息
                 now += timedelta(hours=1)
-            InterviewTimeList.append(InterviewTime(now=now, end=now+delta, positions=x["地点"]))
+            InterviewTimeList.append(InterviewTime(now=now, end=now+delta, positions=x["地点"],staff_position=staff_position))
             now += delta
 
     #for x in InterviewTimeList:

@@ -7,14 +7,16 @@ class InterviewTime:
     datetime = [] #开始时间和结束时间,datetime格式
     datetime_str = "" #开始时间和结束时间,字符串格式
     positions = []
+    staff_position = ''
     interviewers = []
     interviewees = []
-    def __init__(self, now, end, positions):
+    def __init__(self, now, end, positions, staff_position):
         self.datetime = [now, end]
         self.positions = positions
         self.datetime_str = now.strftime("%Y.%m.%d %H:%M:%S") + "-" + end.strftime("%Y.%m.%d %H:%M:%S")
         self.interviewers = []
         self.interviewees = []
+        self.staff_position = staff_position
 
 class Interviewee:
     '''
