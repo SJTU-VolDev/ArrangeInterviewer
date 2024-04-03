@@ -1,0 +1,7 @@
+openpyxl
+pandas==2.0
+numpy==1.21
+networkx
+pyinstaller
+xlsxwriter
+requests

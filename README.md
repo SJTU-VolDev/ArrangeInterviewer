@@ -1,3 +1,13 @@
+## 安装依赖
+```shell
+pip install -r requirements.txt
+```
+
+## 运行
+```shell
+python main.py
+```
+
 ## 目标：
 + 面试时间段划分/教室划分 （已完成）
 + 招募人员进行面试时间安排（手动罢）
