@@ -28,14 +28,14 @@ class Interviewee:
     email = ''
     tel = ''
     jaccount = ''
-    time = None
+    interview_time = ''
     def __init__(self, name, id, tel, email):
         self.name = name
         self.id = id
         self.tel = tel
         self.email = email
         self.jaccount = email.split('@')[0]
-        self.time = None
+        self.interview_time = ''
    
         
 class Interviewer_interviewtime:

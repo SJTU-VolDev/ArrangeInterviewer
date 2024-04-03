@@ -1,5 +1,6 @@
 import networkx as nx
 import json
+import pandas as pd
 from GlobalVar import InterviewTimeList, InterviewerList, IntervieweeList
 from collections import Counter
 from datetime import datetime
@@ -128,9 +129,41 @@ def arrangeInterviewerAndStaff():
     #     print("场务时间段：")
     #     print(x.staff_time)
             
+def inputInterviewerArranged(interviewers):
+    '''
+    读取已安排的面试官信息
+    '''
+    data = pd.read_excel(r'result\面试官安排.xlsx')
+    for i in range(len(data)):
+        if data['身份'][i] != '面试官':
+            continue
+        time_slot = str(data['日期'][i]) + " " + str(data["时间段"][i])
+        interviewers[time_slot] = interviewers.get(time_slot, 0) + 1
+    ret = []
+    for x in interviewers.keys():
+        ret.append([x, interviewers[x]])
+    return ret
 
 
-            
+def arrangeInterviewee():
+    '''
+    在安排完面试官后，按照面试官比例安排面试者
+    '''
+    interviewers = inputInterviewerArranged({})
+    totInterviewer = sum(interviewers[i][1] for i in range(len(interviewers)))
+    totInterviewee = len(IntervieweeList)
+    time_slot = 0
+    start = 0
+    for time_slot in range(len(interviewers)):
+        l = int((interviewers[time_slot][1] / totInterviewer) * totInterviewee)+1
+        end = int(start + l)
+        # print(l,start,end)
+        if end >= totInterviewee:
+            end = totInterviewee
+        for i in range(start, end):
+            IntervieweeList[i].interview_time = interviewers[time_slot][0]
+        start = end
+    
 
 
         
