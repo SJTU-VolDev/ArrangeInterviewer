@@ -1,3 +1,10 @@
+# 面试官安排
+## 功能
++ 面试时间段划分/教室划分 :heavy_check_mark:
++ 招募人员进行面试时间安排 :heavy_check_mark:
++ 面试官安排 :heavy_check_mark:
++ 时间调整 :x:
+
 ## 安装依赖
 ```shell
 pip install -r requirements.txt
@@ -7,12 +14,6 @@ pip install -r requirements.txt
 ```shell
 python main.py
 ```
-
-## 功能
-+ 面试时间段划分/教室划分 :heavy_check_mark:
-+ 招募人员进行面试时间安排 :heavy_check_mark:
-+ 面试官安排 :heavy_check_mark:
-+ 时间调整 :x:
 
 ## 输入数据
 + 面试官信息 `data/面试官信息.xlsx`
