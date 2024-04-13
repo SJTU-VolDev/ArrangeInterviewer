@@ -5,7 +5,7 @@ from output import outputInterviewerAndStaff, outputInterviewee
 import os
 if __name__ == "__main__":
     
-    if os.path.exists(r'result\面试官安排.xlsx') == False:
+    if os.path.exists(os.path.join('result','面试官安排.xlsx')) == False:
         print("未检测到面试官安排表,正在生成面试官安排表")
         init()
         arrangeInterviewerAndStaff()

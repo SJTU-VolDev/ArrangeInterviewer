@@ -1,5 +1,6 @@
 import networkx as nx
 import json
+import os
 import pandas as pd
 from GlobalVar import InterviewTimeList, InterviewerList, IntervieweeList
 from collections import Counter
@@ -38,7 +39,7 @@ def arrangeStaff():
     '''
     为场务安排面试时段
     '''
-    with open(r'data\config.json', 'r', encoding='utf-8') as file:
+    with open(os.path.join('data','config.json'), 'r', encoding='utf-8') as file:
         config = json.load(file)
     G = nx.DiGraph()
     source = "source"
@@ -77,7 +78,7 @@ def arrangeInterviewer():
     '''
     为场务安排时间段
     '''
-    with open(r'data\config.json', 'r', encoding='utf-8') as file:
+    with open(os.path.join('data','config.json'), 'r', encoding='utf-8') as file:
         config = json.load(file)
     G = nx.DiGraph()
     source = "source"

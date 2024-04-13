@@ -1,6 +1,7 @@
 from GlobalVar import InterviewTimeList, InterviewerList, IntervieweeList
 import pandas as pd
 from datetime import datetime
+import os
 def outputInterviewerAndStaff():
     df = pd.DataFrame(columns=['日期','时间段','姓名', '身份','地点'])
     for x in InterviewTimeList:
@@ -41,7 +42,7 @@ def outputInterviewerAndStaff():
                     }
                     df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
         
-    df.to_excel(r'result\面试官安排.xlsx', index=False)
+    df.to_excel(os.path.join('result','面试官安排.xlsx'), index=False)
 
 def outputInterviewee():
     '''
@@ -58,7 +59,7 @@ def outputInterviewee():
             '面试时间': x.interview_time
         }
         df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
-    df.to_excel(r'result\面试者安排.xlsx', index=False)
+    df.to_excel(os.path.join('result','面试者安排.xlsx'), index=False)
 
 
 if __name__ == "__main__":

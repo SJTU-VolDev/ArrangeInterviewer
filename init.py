@@ -4,15 +4,16 @@ from model import InterviewTime, Interviewer, Interviewee
 from GlobalVar import InterviewTimeList, InterviewerList, IntervieweeList
 import pandas as pd
 import json
+import os
 
 
 def splitTime():
     '''
     将面试时间段划分为单个面试时间
     '''
-    with open(r'data\config.json', 'r', encoding='utf-8') as file:
+    with open(os.path.join("data","config.json"), 'r', encoding='utf-8') as file:
         config = json.load(file)
-    with open(r'data\面试时间段.json', 'r', encoding='utf-8') as file:
+    with open(os.path.join("data","面试时间段.json"), 'r', encoding='utf-8') as file:
         totTime = json.load(file)
     time_format = '%Y.%m.%d %H:%M'
     for x in totTime['面试时间段']:
@@ -34,7 +35,7 @@ def inputInterviewee():
     '''
     读取面试者信息
     '''
-    data = pd.read_excel(r'data\面试者信息.xlsx')
+    data = pd.read_excel(os.path.join('data','面试者信息.xlsx'))
     for i in range(len(data)):
         interviewee = Interviewee(data["姓名"][i], data["学号"][i], data["电话"][i], data["邮箱"][i])
         IntervieweeList.append(interviewee)
@@ -56,7 +57,7 @@ def makeTimeFormat(t):
 
     
 def inputInterviewer():
-    data = pd.read_excel(r'data\面试官信息.xlsx')
+    data = pd.read_excel(os.path.join('data','面试官信息.xlsx'))
     for i in range(len(data)):
         if data["姓名"][i] == None:
             continue
@@ -77,6 +78,7 @@ def inputInterviewer():
     
             
 def init():
+    os.mkdir('result')
     splitTime()
     inputInterviewer()
     #inputInterviewee()
@@ -85,5 +87,5 @@ if __name__ == '__main__':
     splitTime()
     inputInterviewer()
     #inputInterviewee()
-    
+
     print('done')
