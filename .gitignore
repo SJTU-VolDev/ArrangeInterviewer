@@ -1,3 +1,4 @@
 data/*.xlsx
 __pycache__/
 result/*.xlsx
+.DS_Store
