@@ -119,6 +119,112 @@ class ScheduleManager:
 
         return False
 
+    def balance_workload(self) -> bool:
+        """平衡工作量，将工作量大的人的工作尽可能分配给工作量小的人"""
+        # 记录平衡过程
+        self.balance_process = []
+        
+        # 获取所有有工作的人及其工作量
+        workload = [(name, self.assignment_count[name]) 
+                   for name in self.person_assignments.keys()]
+        
+        if not workload:
+            return False
+        
+        # 计算平均工作量
+        avg_workload = sum(count for _, count in workload) / len(workload)
+        self.balance_process.append(f"当前平均工作量: {avg_workload:.2f}")
+        
+        # 按工作量排序（从高到低）
+        workload.sort(key=lambda x: (-x[1], x[0]))
+        
+        # 找出工作量明显高于平均值的人（超过平均值1次以上）
+        overloaded = [name for name, count in workload if count > avg_workload + 1]
+        
+        # 找出工作量明显低于平均值的人（低于平均值1次以上）
+        underloaded = [name for name, count in workload if count < avg_workload - 1]
+        
+        if not overloaded or not underloaded:
+            self.balance_process.append("当前工作量分配已经较为平衡，无需调整")
+            return False
+        
+        self.balance_process.append(f"工作量过高的人: {', '.join(overloaded)}")
+        self.balance_process.append(f"工作量过低的人: {', '.join(underloaded)}")
+        
+        changes_made = False
+        
+        # 对每个工作量过高的人尝试重新分配
+        for busy_person in overloaded:
+            if busy_person not in self.person_assignments:
+                continue
+            
+            # 获取这个人的所有工作时间段
+            busy_person_times = {
+                assignment['时间']: assignment
+                for assignment in self.person_assignments[busy_person]
+            }
+            
+            # 对每个时间段的工作尝试重新分配
+            for time_slot, assignment in busy_person_times.items():
+                role = assignment['职务']
+                location = assignment['地点']
+                dept = assignment['部门']
+                
+                # 在工作量少的人中寻找可以接手这个工作的人
+                for free_person in underloaded:
+                    # 检查是否可以接手这个工作
+                    can_take_job = False
+                    if role == '场务':
+                        can_take_job = any(n == free_person for n, _ in self.staff_data[time_slot])
+                    else:  # 面试官
+                        can_take_job = any(n == free_person for n, _ in self.interviewer_data[time_slot])
+                    
+                    # 检查该时间段是否已有其他工作
+                    has_conflict = any(a['时间'] == time_slot 
+                                     for a in self.person_assignments.get(free_person, []))
+                    
+                    if can_take_job and not has_conflict:
+                        try:
+                            # 创建新的工作记录
+                            new_assignment = {
+                                '时间': time_slot,
+                                '地点': location,
+                                '职务': role,
+                                '姓名': free_person,
+                                '部门': dept
+                            }
+                            
+                            # 更新工作记录
+                            self.person_assignments[busy_person].remove(assignment)
+                            if free_person not in self.person_assignments:
+                                self.person_assignments[free_person] = []
+                            self.person_assignments[free_person].append(new_assignment)
+                            
+                            # 更新计数
+                            self.assignment_count[busy_person] -= 1
+                            self.assignment_count[free_person] += 1
+                            
+                            changes_made = True
+                            self.balance_process.append(f"已将 {busy_person} 的工作（{time_slot} {location}）转移给 {free_person}")
+                            
+                            # 如果工作量已经平衡，就不再继续转移
+                            if self.assignment_count[busy_person] <= avg_workload:
+                                break
+                        except ValueError:
+                            # 如果删除失败，跳过这次转移
+                            continue
+                
+                if self.assignment_count[busy_person] <= avg_workload:
+                    break
+        
+        if changes_made:
+            self.balance_process.append("\n工作量调整后的分配情况：")
+            for name, count in sorted(self.assignment_count.items(), key=lambda x: (-x[1], x[0])):
+                if count > 0:
+                    self.balance_process.append(f"{name}: {count}次")
+        
+        return changes_made
+
     def generate_schedule(self) -> pd.DataFrame:
         """生成排班表"""
         schedule_data = []
@@ -236,6 +342,33 @@ class ScheduleManager:
             else:
                 print("所有人都已成功分配到工作！")
         
+        # 尝试平衡工作量
+        print("正在尝试平衡工作量...")
+        if self.balance_workload():
+            print("成功调整了部分工作分配以平衡工作量")
+        else:
+            print("当前工作量分配已经较为平衡，无需调整")
+        
+        # 重新生成排班数据
+        schedule_data = []
+        for time_slot in sorted(self.time_slots):
+            for location in self.locations:
+                found_assignments = False
+                for assignments in self.person_assignments.values():
+                    for assignment in assignments:
+                        if assignment['时间'] == time_slot and assignment['地点'] == location:
+                            schedule_data.append(assignment)
+                            found_assignments = True
+                
+                if not found_assignments:
+                    schedule_data.append({
+                        '时间': time_slot,
+                        '地点': location,
+                        '职务': '',
+                        '姓名': '',
+                        '部门': ''
+                    })
+        
         # 创建DataFrame并按时间和地点排序
         schedule_df = pd.DataFrame(schedule_data)
         
@@ -290,13 +423,21 @@ class ScheduleManager:
                     f.write(f"{name} (可用时间段: {', '.join(sorted(available_times))})\n")
             else:
                 f.write("所有人都已成功分配到工作！\n")
+            
+            # 添加工作量平衡过程记录
+            if hasattr(self, 'balance_process') and self.balance_process:
+                f.write("\n" + "=" * 40 + "\n")
+                f.write("\n工作量平衡过程：\n")
+                f.write("-" * 30 + "\n")
+                for line in self.balance_process:
+                    f.write(line + "\n")
 
     def save_schedule(self, output_file: str):
         """保存排班表到Excel文件，并合并相同的时间和地点单元格"""
         schedule_df = self.generate_schedule()
         
         # 生成工作分配检查报告
-        report_file = output_file.rsplit('.', 1)[0] + '_检查报告.txt'
+        report_file = output_file.rsplit('.', 1)[0] + '_log.txt'
         self.generate_assignment_report(report_file)
         
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
