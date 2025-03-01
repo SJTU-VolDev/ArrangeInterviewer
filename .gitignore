@@ -1,1 +1,4 @@
 venv/
+output/*.txt
+output/*.xlsx
+tables/*.xlsx
