@@ -38,6 +38,29 @@
 └── interviewee_scheduler.py # 面试者排表程序
 ```
 
+## 环境配置
+
+### 系统要求
+- Python 3.7 或更高版本
+- pip 包管理器
+
+### 安装依赖
+1. 克隆或下载本项目到本地
+
+2. 在项目根目录下安装所需依赖：
+```bash
+pip install -r requirements.txt
+```
+
+所需的主要依赖包括：
+- pandas >= 1.5.0：用于数据处理和Excel文件操作
+- openpyxl >= 3.0.10：用于Excel文件的读写
+
+### 推荐的开发环境
+- Visual Studio Code
+- PyCharm
+- 或其他支持Python的IDE
+
 ## 使用方法
 
 ### 1. 面试官和场务排表
