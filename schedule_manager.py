@@ -516,9 +516,9 @@ def main():
     
     locations = sys.argv[1:]  # 所有地点参数
     
-    manager = ScheduleManager('tables/raw.xlsx', locations)
+    manager = ScheduleManager('tables/interviewer.xlsx', locations)
     manager.process_data()
-    manager.save_schedule('tables/schedule.xlsx')
+    manager.save_schedule('output/schedule.xlsx')
 
 if __name__ == "__main__":
     main() 
