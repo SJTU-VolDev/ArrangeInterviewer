@@ -5,6 +5,8 @@ from typing import List, Dict, Tuple
 import openpyxl
 from openpyxl.styles import Alignment, Font, Border, Side
 from openpyxl.styles import PatternFill
+import json
+import os
 
 class IntervieweeScheduler:
     def __init__(self, input_file: str, slot_weights: List[int] = None):
@@ -266,22 +268,32 @@ class IntervieweeScheduler:
             worksheet.column_dimensions['C'].width = 15  # 学号列
 
 def main():
-    if len(sys.argv) < 2:
-        print("使用方法: python interviewee_scheduler.py [权重1 权重2 ...]")
-        print("示例: python interviewee_scheduler.py 19 26 27 28")
-        print("注意: 权重参数数量需要与时间段数量相匹配，如果不提供权重则平均分配")
+    # 读取配置文件
+    try:
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        interviewee_config = config['interviewee_config']
+    except FileNotFoundError:
+        print("错误：找不到配置文件 config.json")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print("错误：配置文件格式不正确")
+        sys.exit(1)
+    except KeyError:
+        print("错误：配置文件缺少必要的配置项")
+        sys.exit(1)
+
+    # 确保输入文件存在
+    input_file = interviewee_config.get('input_file', 'tables/interviewee.xlsx')
+    if not os.path.exists(input_file):
+        print(f"错误：找不到输入文件 {input_file}")
         sys.exit(1)
     
-    # 如果提供了权重参数，将其转换为整数列表
-    slot_weights = None
-    if len(sys.argv) > 1:
-        try:
-            slot_weights = [int(w) for w in sys.argv[1:]]
-        except ValueError:
-            print("错误：权重参数必须是整数")
-            sys.exit(1)
+    # 获取时间段权重
+    slot_weights = interviewee_config.get('slot_weights')
     
-    scheduler = IntervieweeScheduler('tables/interviewee.xlsx', slot_weights)
+    # 创建IntervieweeScheduler实例并执行
+    scheduler = IntervieweeScheduler(input_file, slot_weights)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')

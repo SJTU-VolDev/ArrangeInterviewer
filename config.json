@@ -1,0 +1,16 @@
+{
+    "interviewer_config": {
+        "input_file": "tables/interviewer.xlsx",
+        "locations": [
+            "接待室",
+            "面试室A",
+            "面试室B",
+            "面试室C",
+            "面试室D"
+        ]
+    },
+    "interviewee_config": {
+        "input_file": "tables/interviewee.xlsx",
+        "slot_weights": [15, 26, 27, 28]
+    }
+} 

@@ -5,6 +5,8 @@ from typing import List, Dict, Set, Tuple
 from collections import defaultdict
 import openpyxl
 from openpyxl.styles import Alignment, Font, Border, Side
+import json
+import os
 
 class ScheduleManager:
     def __init__(self, input_file: str, locations: List[str]):
@@ -510,13 +512,34 @@ class ScheduleManager:
         print(f"排班表已生成完成！检查报告已保存至：{report_file}")
 
 def main():
-    if len(sys.argv) < 3:
-        print("使用方法: python schedule_manager.py <场务地点> <面试官地点1> [<面试官地点2> ...]")
+    # 读取配置文件
+    try:
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        interviewer_config = config['interviewer_config']
+    except FileNotFoundError:
+        print("错误：找不到配置文件 config.json")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print("错误：配置文件格式不正确")
+        sys.exit(1)
+    except KeyError:
+        print("错误：配置文件缺少必要的配置项")
+        sys.exit(1)
+
+    # 验证配置
+    if not interviewer_config.get('locations'):
+        print("错误：配置文件中未指定面试地点")
         sys.exit(1)
     
-    locations = sys.argv[1:]  # 所有地点参数
+    # 确保输入文件存在
+    input_file = interviewer_config.get('input_file', 'tables/interviewer.xlsx')
+    if not os.path.exists(input_file):
+        print(f"错误：找不到输入文件 {input_file}")
+        sys.exit(1)
     
-    manager = ScheduleManager('tables/interviewer.xlsx', locations)
+    # 创建ScheduleManager实例并执行
+    manager = ScheduleManager(input_file, interviewer_config['locations'])
     manager.process_data()
     manager.save_schedule('output/schedule.xlsx')
 

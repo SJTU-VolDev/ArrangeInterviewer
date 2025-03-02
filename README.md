@@ -5,6 +5,7 @@
 - 老版的面试时间安排系统对原始数据文件格式要求较为严苛，需要手动调整，新版系统对格式要求较为宽松，可以自动识别并读取。
 - 老版对于面试者和面试官的排版总是在一起进行的，新版系统可以分开单独进行。
 - 新版系统新增了面试官和场务的排班日志文件，可以查看每个面试官和场务的具体工作安排。
+- 新版系统支持通过配置文件进行参数配置，使用更加方便。
 
 ## 功能特点
 
@@ -18,7 +19,7 @@
 2. 面试者排表 (`interviewee_scheduler.py`)
    - 自动识别并读取面试者的可选时间段
    - 确保所有时间段都能被充分利用
-   - 根据面试者的可选时间进行最优分配
+   - 支持按权重分配面试者到不同时间段
    - 生成易读的Excel格式安排表，使用不同颜色区分时间段
    - 提供详细的分配情况报告
 
@@ -34,9 +35,44 @@
 │   ├── schedule_log.txt    # 面试官和场务排班日志
 │   ├── interviewee_schedule.xlsx    # 面试者安排结果
 │   └── interviewee_schedule_log.txt # 面试者安排日志
+├── config.json             # 配置文件
 ├── schedule_manager.py     # 面试官和场务排表程序
 └── interviewee_scheduler.py # 面试者排表程序
 ```
+
+## 配置文件说明
+
+系统使用 `config.json` 文件进行配置，包含以下内容：
+
+```json
+{
+    "interviewer_config": {
+        "input_file": "tables/interviewer.xlsx",  // 面试官和场务信息表路径
+        "locations": [                            // 面试地点列表
+            "接待室",                             // 第一个地点为场务地点
+            "面试室A",                            // 后续地点为面试官地点
+            "面试室B"
+        ]
+    },
+    "interviewee_config": {
+        "input_file": "tables/interviewee.xlsx",  // 面试者信息表路径
+        "slot_weights": [19, 26, 27, 28]          // 各时间段的权重（可选）
+    }
+}
+```
+
+### 配置项说明
+
+1. interviewer_config:
+   - input_file: 面试官和场务信息表的路径
+   - locations: 面试地点列表，第一个为场务地点，其余为面试官地点
+
+2. interviewee_config:
+   - input_file: 面试者信息表的路径
+   - slot_weights: 各时间段的权重列表（可选）
+     - 如果提供，数量必须与实际时间段数量相匹配
+     - 如果不提供，则平均分配面试者到各时间段
+     - 权重值必须为正整数
 
 ## 环境配置
 
@@ -63,19 +99,16 @@ pip install -r requirements.txt
 
 ## 使用方法
 
-### 1. 面试官和场务排表
+1. 准备配置文件
+   - 复制示例配置文件或创建新的 `config.json`
+   - 根据实际需求修改配置项
 
+2. 运行面试官和场务排表程序：
 ```bash
-python schedule_manager.py <场务地点> <面试官地点1> [<面试官地点2> ...]
+python schedule_manager.py
 ```
 
-例如：
-```bash
-python schedule_manager.py "接待室" "面试室A" "面试室B"
-```
-
-### 2. 面试者排表
-
+3. 运行面试者排表程序：
 ```bash
 python interviewee_scheduler.py
 ```
@@ -109,4 +142,5 @@ python interviewee_scheduler.py
 2. 输入文件中的时间格式必须统一
 3. 学号会以文本格式保存，避免出现科学计数法
 4. 如果有未能分配的学生，会在日志文件中列出详细信息
-5. 程序会自动创建output目录（如果不存在） 
+5. 程序会自动创建output目录（如果不存在）
+6. 配置文件必须使用UTF-8编码保存 
