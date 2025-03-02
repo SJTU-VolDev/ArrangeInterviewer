@@ -9,11 +9,9 @@ import json
 import os
 
 class ScheduleManager:
-    def __init__(self, input_file: str, locations: List[str]):
+    def __init__(self, input_file: str, time_locations: Dict[str, List[str]]):
         self.input_file = input_file
-        self.locations = locations  # 保存完整的地点列表，保持顺序
-        self.staff_location = locations[0]  # 第一个地点是场务地点
-        self.interviewer_locations = locations[1:]  # 剩余地点是面试官地点
+        self.time_locations = time_locations  # 每个时间段对应的地点列表
         self.df = None
         self.time_slots = set()
         self.staff_data = defaultdict(list)
@@ -227,6 +225,24 @@ class ScheduleManager:
         
         return changes_made
 
+    def get_locations_for_time(self, time_slot: str) -> List[str]:
+        """获取指定时间段的地点列表"""
+        locations = self.time_locations.get(time_slot, [])
+        if not locations:
+            print(f"警告：时间段 {time_slot} 未配置地点列表")
+            return []
+        return locations
+
+    def get_staff_location(self, time_slot: str) -> str:
+        """获取指定时间段的场务地点（第一个地点）"""
+        locations = self.get_locations_for_time(time_slot)
+        return locations[0] if locations else None
+
+    def get_interviewer_locations(self, time_slot: str) -> List[str]:
+        """获取指定时间段的面试官地点列表（除第一个地点外的所有地点）"""
+        locations = self.get_locations_for_time(time_slot)
+        return locations[1:] if len(locations) > 1 else []
+
     def generate_schedule(self) -> pd.DataFrame:
         """生成排班表"""
         schedule_data = []
@@ -241,6 +257,14 @@ class ScheduleManager:
                 all_participants.add(name)
         
         for time_slot in sorted(self.time_slots):
+            # 获取该时间段的地点列表
+            locations = self.get_locations_for_time(time_slot)
+            if not locations:
+                continue
+
+            staff_location = self.get_staff_location(time_slot)
+            interviewer_locations = self.get_interviewer_locations(time_slot)
+            
             # 获取该时间段可用的场务和面试官
             available_staff = self.staff_data[time_slot]
             available_interviewers = self.interviewer_data[time_slot]
@@ -249,10 +273,10 @@ class ScheduleManager:
             assigned_people = set()
             
             # 为每个地点创建一个列表来存储分配的人员
-            location_assignments = {loc: [] for loc in self.locations}
+            location_assignments = {loc: [] for loc in locations}
             
             # 1. 首先分配场务（2人）到第一个地点
-            if available_staff:
+            if available_staff and staff_location:
                 # 优先选择工作分配次数最少的人
                 staff_assignments = self.get_least_assigned_people(available_staff, 2)
                 for staff, dept in staff_assignments:
@@ -260,12 +284,12 @@ class ScheduleManager:
                     self.assignment_count[staff] += 1
                     assignment = {
                         '时间': time_slot,
-                        '地点': self.staff_location,
+                        '地点': staff_location,
                         '职务': '场务',
                         '姓名': staff,
                         '部门': dept
                     }
-                    location_assignments[self.staff_location].append(assignment)
+                    location_assignments[staff_location].append(assignment)
                     self.person_assignments[staff].append(assignment)
             
             # 2. 分配面试官
@@ -273,17 +297,17 @@ class ScheduleManager:
             available_interviewers = [(name, dept) for name, dept in available_interviewers 
                                     if name not in assigned_people]
             
-            if available_interviewers:
+            if available_interviewers and interviewer_locations:
                 # 计算每个地点的面试官数量
                 total_interviewers = len(available_interviewers)
                 min_interviewers_per_location = 3  # 每个地点至少3人
                 max_interviewers_per_location = self.MAX_INTERVIEWERS_PER_LOCATION  # 每个地点最多4人
                 
                 # 计算实际每个地点的面试官数量
-                if total_interviewers >= len(self.interviewer_locations) * min_interviewers_per_location:
+                if total_interviewers >= len(interviewer_locations) * min_interviewers_per_location:
                     interviewers_per_location = min(
                         max_interviewers_per_location,
-                        total_interviewers // len(self.interviewer_locations)
+                        total_interviewers // len(interviewer_locations)
                     )
                 else:
                     interviewers_per_location = min_interviewers_per_location
@@ -291,7 +315,7 @@ class ScheduleManager:
                 # 分配面试官到各个地点
                 remaining_interviewers = available_interviewers.copy()
                 
-                for location in self.interviewer_locations:
+                for location in interviewer_locations:
                     if not remaining_interviewers:
                         break
                         
@@ -316,7 +340,7 @@ class ScheduleManager:
                         self.person_assignments[interviewer].append(assignment)
             
             # 3. 按照地点顺序添加所有记录
-            for location in self.locations:
+            for location in locations:
                 assignments = location_assignments[location]
                 if assignments:  # 如果有分配的人员
                     schedule_data.extend(assignments)
@@ -354,7 +378,7 @@ class ScheduleManager:
         # 重新生成排班数据
         schedule_data = []
         for time_slot in sorted(self.time_slots):
-            for location in self.locations:
+            for location in self.get_locations_for_time(time_slot):
                 found_assignments = False
                 for assignments in self.person_assignments.values():
                     for assignment in assignments:
@@ -375,7 +399,7 @@ class ScheduleManager:
         schedule_df = pd.DataFrame(schedule_data)
         
         # 创建地点顺序映射
-        location_order = {loc: idx for idx, loc in enumerate(self.locations)}
+        location_order = {loc: idx for idx, loc in enumerate(self.get_locations_for_time(time_slot)) if loc in self.time_locations[time_slot]}
         schedule_df['地点顺序'] = schedule_df['地点'].map(location_order)
         
         # 按时间和地点顺序排序
@@ -528,8 +552,8 @@ def main():
         sys.exit(1)
 
     # 验证配置
-    if not interviewer_config.get('locations'):
-        print("错误：配置文件中未指定面试地点")
+    if not interviewer_config.get('time_locations'):
+        print("错误：配置文件中未指定时间段地点映射")
         sys.exit(1)
     
     # 确保输入文件存在
@@ -539,7 +563,7 @@ def main():
         sys.exit(1)
     
     # 创建ScheduleManager实例并执行
-    manager = ScheduleManager(input_file, interviewer_config['locations'])
+    manager = ScheduleManager(input_file, interviewer_config['time_locations'])
     manager.process_data()
     manager.save_schedule('output/schedule.xlsx')
 
