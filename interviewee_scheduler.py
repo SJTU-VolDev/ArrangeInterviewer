@@ -7,11 +7,12 @@ from openpyxl.styles import Alignment, Font, Border, Side
 from openpyxl.styles import PatternFill
 
 class IntervieweeScheduler:
-    def __init__(self, input_file: str):
+    def __init__(self, input_file: str, slot_weights: List[int] = None):
         self.input_file = input_file
         self.df = None
         self.time_slots = set()
         self.time_slot_assignments = defaultdict(list)
+        self.slot_weights = slot_weights  # 新增：时间段权重参数
         
     def identify_columns(self) -> Tuple[str, str, str]:
         """识别包含关键信息的列名"""
@@ -48,7 +49,7 @@ class IntervieweeScheduler:
             self.student_available_times[(name, student_id)] = time_slots
     
     def assign_time_slots(self):
-        """为每个学生分配时间段，确保所有时间段都被使用"""
+        """为每个学生分配时间段，根据权重确保时间段分配比例"""
         # 用于收集所有输出信息
         log_messages = []
         
@@ -58,6 +59,21 @@ class IntervieweeScheduler:
             key=lambda x: (len(x[1]), x[0])
         )
         
+        # 计算总学生数
+        total_students = len(students_by_availability)
+        
+        # 如果提供了权重，计算每个时间段的目标人数
+        if self.slot_weights and len(self.slot_weights) == len(self.time_slots):
+            total_weight = sum(self.slot_weights)
+            target_counts = {
+                time_slot: int(round((weight / total_weight) * total_students))
+                for time_slot, weight in zip(sorted(self.time_slots), self.slot_weights)
+            }
+        else:
+            # 如果没有提供权重，平均分配
+            students_per_slot = total_students // len(self.time_slots)
+            target_counts = {time_slot: students_per_slot for time_slot in self.time_slots}
+        
         # 记录每个时间段的已分配人数
         slot_assignments = defaultdict(int)
         
@@ -66,7 +82,7 @@ class IntervieweeScheduler:
         assigned_students = set()
         
         # 首先，尝试为每个时间段分配至少一个学生
-        for time_slot in self.time_slots:
+        for time_slot in sorted(self.time_slots):
             assigned = False
             # 寻找可以在这个时间段面试的学生
             for (name, student_id), available_times in students_by_availability:
@@ -80,19 +96,22 @@ class IntervieweeScheduler:
             if not assigned:
                 log_messages.append(f"警告：时间段 {time_slot} 没有找到可用的学生！")
         
-        # 第二轮：分配剩余的学生
+        # 第二轮：根据权重分配剩余的学生
         for (name, student_id), available_times in students_by_availability:
             if (name, student_id) in assigned_students:
                 continue
                 
-            # 在该学生的可用时间段中找人数最少的时间段
+            # 在该学生的可用时间段中找最需要人的时间段
             best_slot = None
-            min_assigned = float('inf')
+            max_need = -float('inf')
             
             for time_slot in available_times:
                 current_assigned = slot_assignments[time_slot]
-                if current_assigned < min_assigned:
-                    min_assigned = current_assigned
+                target_count = target_counts[time_slot]
+                # 计算当前时间段还需要多少人
+                need_count = target_count - current_assigned
+                if need_count > max_need:
+                    max_need = need_count
                     best_slot = time_slot
             
             if best_slot:
@@ -106,7 +125,9 @@ class IntervieweeScheduler:
         log_messages.append("\n时间段分配情况：")
         for time_slot in sorted(self.time_slots):
             count = len(self.time_slot_assignments[time_slot])
-            log_messages.append(f"时间段 {time_slot}: {count} 人")
+            target = target_counts[time_slot]
+            percentage = (count / total_students) * 100 if total_students > 0 else 0
+            log_messages.append(f"时间段 {time_slot}: {count} 人 (目标: {target} 人, 实际占比: {percentage:.1f}%)")
         
         # 处理未分配的学生
         if unassigned_students:
@@ -245,11 +266,22 @@ class IntervieweeScheduler:
             worksheet.column_dimensions['C'].width = 15  # 学号列
 
 def main():
-    if len(sys.argv) != 1:
-        print("使用方法: python interviewee_scheduler.py")
+    if len(sys.argv) < 2:
+        print("使用方法: python interviewee_scheduler.py [权重1 权重2 ...]")
+        print("示例: python interviewee_scheduler.py 19 26 27 28")
+        print("注意: 权重参数数量需要与时间段数量相匹配，如果不提供权重则平均分配")
         sys.exit(1)
     
-    scheduler = IntervieweeScheduler('tables/interviewee.xlsx')
+    # 如果提供了权重参数，将其转换为整数列表
+    slot_weights = None
+    if len(sys.argv) > 1:
+        try:
+            slot_weights = [int(w) for w in sys.argv[1:]]
+        except ValueError:
+            print("错误：权重参数必须是整数")
+            sys.exit(1)
+    
+    scheduler = IntervieweeScheduler('tables/interviewee.xlsx', slot_weights)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')
