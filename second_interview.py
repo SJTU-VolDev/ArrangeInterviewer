@@ -1,9 +1,15 @@
 import pandas as pd
 import xlsxwriter
+import json
 from collections import defaultdict, Counter
 
+# 读取配置文件
+with open('config.json', 'r', encoding='utf-8') as f:
+    config = json.load(f)
+    second_interview_config = config['second_interview_config']
+
 # 1. 读取输入文件并初始化部门名单
-df = pd.read_excel('tables/raw.xlsx')
+df = pd.read_excel(second_interview_config['input_file'])
 dept_lists = {
     '人资': df['人资'].dropna().tolist(),
     '外联': df['外联'].dropna().tolist(),
@@ -22,7 +28,7 @@ def split_into_four(total):
 dept_targets = {dept: split_into_four(len(candidates)) for dept, candidates in dept_lists.items()}
 
 # 3. 初始化时间段和部门的空数组
-times = ['时间1', '时间2', '时间3', '时间4']
+times = second_interview_config['times']
 assignments = {}
 for i, time in enumerate(times):
     assignments[time] = {dept: [''] * dept_targets[dept][i] for dept in dept_lists}
@@ -51,17 +57,17 @@ def assign_double_candidates(combo, candidates, assignments):
     group1 = candidates[:group1_size]  # 前两场
     group2 = candidates[group1_size:]  # 后两场
 
-    # 分配前两场（时间1和时间2）
+    # 分配前两场
     for i, candidate in enumerate(group1):
-        time1, time2 = '时间1', '时间2'
+        time1, time2 = times[0], times[1]
         if i % 2 == 0:
             assign_to_slots(assignments, candidate, time1, dept1, time2, dept2)
         else:
             assign_to_slots(assignments, candidate, time1, dept2, time2, dept1)
 
-    # 分配后两场（时间3和时间4）
+    # 分配后两场
     for i, candidate in enumerate(group2):
-        time1, time2 = '时间3', '时间4'
+        time1, time2 = times[2], times[3]
         if i % 2 == 0:
             assign_to_slots(assignments, candidate, time1, dept1, time2, dept2)
         else:
@@ -132,6 +138,13 @@ df_output.to_excel(writer, index=False, sheet_name='Sheet1')
 workbook = writer.book
 worksheet = writer.sheets['Sheet1']
 
+# 创建一个居中对齐的格式
+center_format = workbook.add_format({'align': 'center', 'valign': 'vcenter'})
+
+# 应用居中格式到所有单元格
+for col_num, col_data in enumerate(df_output.columns):
+    worksheet.set_column(col_num, col_num, None, center_format)
+
 # 合并时间列
 row_index = 1
 for time, rows in time_rows.items():
@@ -143,4 +156,4 @@ for time, rows in time_rows.items():
 
 writer.close()
 
-print("排表已生成，输出文件为 'output.xlsx'，调试信息已保存到 'debug_info.txt'")
+print("排表已生成，输出文件为 'second_schedule.xlsx'，调试信息已保存到 'second_schedule_log.txt'")

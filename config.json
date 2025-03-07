@@ -63,5 +63,14 @@
     "interviewee_config": {
         "input_file": "tables/interviewee.xlsx",
         "slot_weights": [15, 26, 27, 28]
+    },
+    "second_interview_config": {
+        "input_file": "tables/second_interviee.xlsx",
+        "times": [
+            "上午1",
+            "上午2",
+            "下午1",
+            "下午2"
+        ]
     }
 } 
