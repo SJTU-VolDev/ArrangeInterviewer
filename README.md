@@ -7,6 +7,7 @@
 - 新版系统新增了面试官和场务的排班日志文件，可以查看每个面试官和场务的具体工作安排。
 - 新版支持权重分配面试者的功能，解决了部分场次因为人员不足或者场地有限造成的面试者人数不均的问题。
 - 新版在v4.0之后加入了二面排表功能，可以自动识别并读取二面面试者的可选时间段，能找到所有需要面试两轮的人员名单，且确保他们的面试场次一定相邻（上午的两场或者下午的两场）。
+- 在v5,0之后，加入了makefile文件，可以直接使用make命令运行不同的程序，操作更简单（详情请见文档最后的Make方法）。
 
 ## 功能特点
 
@@ -46,13 +47,17 @@
 │   ├── second_schedule.xlsx # 二面面试结果
 │   ├── double_interviewee.txt    # 二面需要面试两轮的名单
 │   └── second_interview_log.txt # 二面面试日志
+├── .gitignore # Git忽略文件
+├── README.md               # 项目说明文档
+├── requirements.txt        # 依赖包列表
+├── Makefile                # Makefile文件
 ├── config.json             # 配置文件
-├── schedule_manager.py     # 面试官和场务排表程序
-├── interviewee_scheduler.py # 面试者排表程序
-└── second_interview.py # 二面排表程序
+├── schedule_manager.py     # 面试官和场务排表程序   ——
+├── interviewee_scheduler.py # 面试者排表程序         |  主要的脚本文件
+└── second_interview.py # 二面排表程序              ——
 ```
 
-## 配置文件说明
+## 配置文件说明（也可以选择使用make方法，在文档末端）
 
 系统使用 `config.json` 文件进行配置，包含以下内容：
 
@@ -198,3 +203,33 @@ python second_interview.py
 5. 如果有未能分配的学生，会在日志文件中列出详细信息
 6. 程序会自动创建output目录（如果不存在）
 7. 配置文件必须使用UTF-8编码保存 
+
+## Make方法（v5.0之后新增功能）
+
+为了方便用户使用，我们在v5.0之后加入了makefile文件，可以直接使用make命令运行不同的程序，以实现不同的功能。
+
+ 1. 配置虚拟环境和相关依赖
+
+```bash
+make setup
+```
+
+ 2. 运行面试官和场务排表程序
+
+```bash
+make interviewer
+```
+
+ 3. 运行一面面试者排表程序
+
+```bash
+make interviewee_1
+```
+
+ 4. 运行二面面试者排表程序
+
+```bash
+make interviewee_2
+```
+
+利用Makefile文件，可以更方便地运行程序，提高工作效率。
