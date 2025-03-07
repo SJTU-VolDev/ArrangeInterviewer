@@ -44,6 +44,28 @@ for candidate in double_candidates:
     depts = [dept for dept, candidates in dept_lists.items() if candidate in candidates]
     double_dept_info[candidate] = sorted(depts)  # 排序确保组合唯一
 
+# 输出双部门面试人员信息到文件
+with open('output/double_interviewee.txt', 'w', encoding='utf-8') as f:
+    # 写入双部门人员信息
+    f.write("需要面试两个部门的人员名单：\n")
+    for candidate, depts in double_dept_info.items():
+        f.write(f"{candidate} - {', '.join(depts)}\n")
+    
+    # 添加空行分隔
+    f.write("\n")
+    
+    # 写入每种部门组合的人数及人员名单
+    f.write("每种部门组合的人员名单：\n")
+    combo_counter = defaultdict(list)
+    for candidate, depts in double_dept_info.items():
+        sorted_depts = tuple(depts)  # depts已经排序过了
+        combo_counter[sorted_depts].append(candidate)
+    
+    for combo, candidates in combo_counter.items():
+        f.write(f"{combo[0]} - {combo[1]}: {len(candidates)} 人 - {', '.join(candidates)}\n")
+
+print("双部门面试人员信息已保存到 'output/double_interviewee.txt'")
+
 # 按部门组合分组
 combo_candidates = defaultdict(list)
 for candidate, depts in double_dept_info.items():
