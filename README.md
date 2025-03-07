@@ -131,7 +131,7 @@ pip install -r requirements.txt
 所需的主要依赖包括：
 - pandas >= 1.5.0：用于数据处理和Excel文件操作
 - openpyxl >= 3.0.10：用于Excel文件的读写
-- xlsxwriter>=1.3.7：用于生成Excel文件
+- xlsxwriter >= 1.3.7：用于生成Excel文件
 
 ### 推荐的开发环境
 - Visual Studio Code
