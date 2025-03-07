@@ -80,9 +80,9 @@
         "slot_weights": [19, 26, 27, 28]          // 各时间段的权重（可选，默认是平均分配）
     },
     "second_interview_config": {
-        "input_file": "tables/second_interviee.xlsx",
-        "times": [
-            "时间1",
+        "input_file": "tables/second_interviee.xlsx",   // 二面面试者信息表路径
+        "times": [                                      //二面面试时间段
+            "时间1",                  
             "时间2",
             "时间3",
             "时间4"
