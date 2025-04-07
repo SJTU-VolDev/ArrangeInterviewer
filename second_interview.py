@@ -7,15 +7,19 @@ from collections import defaultdict, Counter
 with open('config.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
     second_interview_config = config['second_interview_config']
+    interviewer_config = config.get('interviewer_config', {})
 
 # 1. 读取输入文件并初始化部门名单
 df = pd.read_excel(second_interview_config['input_file'])
-dept_lists = {
-    '人资': df['人资'].dropna().tolist(),
-    '外联': df['外联'].dropna().tolist(),
-    '策划': df['策划'].dropna().tolist(),
-    '宣传': df['宣传'].dropna().tolist()
-}
+# 保持与Excel表头一致的部门顺序
+dept_order = []
+for col in df.columns:
+    if col in ['人资', '外联', '策划', '宣传']:
+        dept_order.append(col)
+
+dept_lists = {}
+for dept in dept_order:
+    dept_lists[dept] = df[dept].dropna().tolist()
 
 # 2. 计算每个部门在四个时间段的预留人数
 def split_into_four(total):
@@ -140,18 +144,20 @@ for time in times:
 
 # 构建输出数据
 data = []
-for time, rows in time_rows.items():
-    for i in range(rows):
+# 按照config.json中的时间顺序
+for time in times:
+    for i in range(time_rows[time]):
         row = [time if i == 0 else '']
-        for dept in dept_lists:
+        # 按照原始Excel表格中的部门顺序
+        for dept in dept_order:
             if i < len(assignments[time][dept]):
                 row.append(assignments[time][dept][i])
             else:
                 row.append('')
         data.append(row)
 
-# 创建DataFrame并指定列名
-df_output = pd.DataFrame(data, columns=['时间', '人资', '外联', '策划', '宣传'])
+# 创建DataFrame并指定列名（使用与原始Excel相同的部门顺序）
+df_output = pd.DataFrame(data, columns=['时间'] + dept_order)
 
 # 写入Excel并合并时间列单元格
 writer = pd.ExcelWriter('output/second_schedule.xlsx', engine='xlsxwriter')

@@ -256,8 +256,12 @@ class ScheduleManager:
             for name, _ in self.interviewer_data[time_slot]:
                 all_participants.add(name)
         
-        for time_slot in sorted(self.time_slots):
-            # 获取该时间段的地点列表
+        # 使用time_locations中的顺序来排序时间段
+        for time_slot in self.time_locations.keys():
+            if time_slot not in self.time_slots:
+                continue
+                
+            # 获取该时间段的地点列表，按照配置文件中的顺序
             locations = self.get_locations_for_time(time_slot)
             if not locations:
                 continue
@@ -375,9 +379,13 @@ class ScheduleManager:
         else:
             print("当前工作量分配已经较为平衡，无需调整")
         
-        # 重新生成排班数据
+        # 重新生成排班数据，保持时间和地点的顺序与配置文件一致
         schedule_data = []
-        for time_slot in sorted(self.time_slots):
+        for time_slot in self.time_locations.keys():
+            if time_slot not in self.time_slots:
+                continue
+                
+            # 使用配置文件中的地点顺序
             for location in self.get_locations_for_time(time_slot):
                 found_assignments = False
                 for assignments in self.person_assignments.values():
@@ -395,16 +403,8 @@ class ScheduleManager:
                         '部门': ''
                     })
         
-        # 创建DataFrame并按时间和地点排序
+        # 创建DataFrame
         schedule_df = pd.DataFrame(schedule_data)
-        
-        # 创建地点顺序映射
-        location_order = {loc: idx for idx, loc in enumerate(self.get_locations_for_time(time_slot)) if loc in self.time_locations[time_slot]}
-        schedule_df['地点顺序'] = schedule_df['地点'].map(location_order)
-        
-        # 按时间和地点顺序排序
-        schedule_df = schedule_df.sort_values(['时间', '地点顺序'])
-        schedule_df = schedule_df.drop('地点顺序', axis=1)
         
         return schedule_df
 

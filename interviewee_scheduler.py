@@ -9,19 +9,20 @@ import json
 import os
 
 class IntervieweeScheduler:
-    def __init__(self, input_file: str, slot_weights: List[int] = None):
+    def __init__(self, input_file: str, slot_weights: List[int] = None, time_order: List[str] = None):
         self.input_file = input_file
         self.df = None
-        self.time_slots = set()
+        self.time_slots = []  # 改为列表，不是集合
         self.time_slot_assignments = defaultdict(list)
-        self.slot_weights = slot_weights  # 新增：时间段权重参数
+        self.slot_weights = slot_weights  # 时间段权重参数
+        self.time_order = time_order  # 时间段顺序参数
         
     def identify_columns(self) -> Tuple[str, str, str]:
         """识别包含关键信息的列名"""
         df = pd.read_excel(self.input_file)
         name_col = next(col for col in df.columns if '姓名' in col)
         student_id_col = next(col for col in df.columns if '学号' in col)
-        time_col = next(col for col in df.columns if '面试时间' in col)
+        time_col = next(col for col in df.columns if '面试' in col)
         return name_col, student_id_col, time_col
     
     def extract_time_slots(self, time_str: str) -> List[str]:
@@ -40,7 +41,27 @@ class IntervieweeScheduler:
         for _, row in self.df.iterrows():
             time_slots = self.extract_time_slots(row[time_col])
             all_time_slots.update(time_slots)
-        self.time_slots = sorted(all_time_slots)
+        
+        print(f"从Excel中收集到的所有时间段: {sorted(all_time_slots)}")
+        print(f"配置文件中的时间顺序: {self.time_order}")
+        
+        # 按照配置文件中的时间顺序初始化时间段列表
+        if self.time_order:
+            # 仅保留配置文件中有且Excel中也有的时间段，保持原始顺序
+            self.time_slots = [t for t in self.time_order if t in all_time_slots]
+            
+            # 检查是否有时间段在Excel中存在但在配置文件中没有指定
+            missing_in_config = [t for t in all_time_slots if t not in self.time_order]
+            if missing_in_config:
+                print(f"警告：以下时间段在Excel中存在但在配置文件中未指定: {missing_in_config}")
+                # 添加这些时间段到列表末尾，以字母顺序排序
+                self.time_slots.extend(sorted(missing_in_config))
+        else:
+            # 如果没有配置文件时间顺序，则按字母顺序排列
+            self.time_slots = sorted(all_time_slots)
+            print("没有从配置文件获取到时间顺序，使用默认排序。")
+        
+        print(f"最终使用的时间段顺序: {self.time_slots}")
         
         # 为每个学生收集可用时间段
         self.student_available_times = {}
@@ -69,7 +90,7 @@ class IntervieweeScheduler:
             total_weight = sum(self.slot_weights)
             target_counts = {
                 time_slot: int(round((weight / total_weight) * total_students))
-                for time_slot, weight in zip(sorted(self.time_slots), self.slot_weights)
+                for time_slot, weight in zip(self.time_slots, self.slot_weights)
             }
         else:
             # 如果没有提供权重，平均分配
@@ -84,7 +105,7 @@ class IntervieweeScheduler:
         assigned_students = set()
         
         # 首先，尝试为每个时间段分配至少一个学生
-        for time_slot in sorted(self.time_slots):
+        for time_slot in self.time_slots:
             assigned = False
             # 寻找可以在这个时间段面试的学生
             for (name, student_id), available_times in students_by_availability:
@@ -123,9 +144,10 @@ class IntervieweeScheduler:
             else:
                 unassigned_students.append((name, student_id))
         
-        # 输出分配结果统计
+        # 输出分配结果统计，严格按照配置文件中的时间顺序
         log_messages.append("\n时间段分配情况：")
-        for time_slot in sorted(self.time_slots):
+        # 使用time_slots的顺序来确保输出顺序与配置文件一致
+        for time_slot in self.time_slots:
             count = len(self.time_slot_assignments[time_slot])
             target = target_counts[time_slot]
             percentage = (count / total_students) * 100 if total_students > 0 else 0
@@ -138,7 +160,12 @@ class IntervieweeScheduler:
                 log_messages.append(f"- {name} ({student_id})")
                 # 输出这些学生的可用时间段，方便手动调整
                 available_times = self.student_available_times[(name, student_id)]
-                log_messages.append(f"  可用时间段: {', '.join(available_times)}")
+                # 按照配置文件中的时间顺序排序可用时间段
+                sorted_available_times = sorted(
+                    available_times,
+                    key=lambda x: self.time_slots.index(x) if x in self.time_slots else len(self.time_slots)
+                )
+                log_messages.append(f"  可用时间段: {', '.join(sorted_available_times)}")
         
         # 保存日志信息到文件
         self.save_log(log_messages)
@@ -159,9 +186,10 @@ class IntervieweeScheduler:
     
     def save_schedule(self, output_file: str):
         """保存排班表到Excel文件，并合并相同时间单元格"""
-        # 准备数据
+        # 准备数据，确保按照配置文件中的时间顺序
         schedule_data = []
-        for time_slot in sorted(self.time_slots):
+        # 按照指定的时间顺序处理
+        for time_slot in self.time_slots:
             assignments = self.time_slot_assignments[time_slot]
             if assignments:
                 for name, student_id in sorted(assignments):
@@ -173,7 +201,21 @@ class IntervieweeScheduler:
         
         # 创建DataFrame，并指定学号列为字符串类型
         schedule_df = pd.DataFrame(schedule_data)
-        schedule_df['学号'] = schedule_df['学号'].astype(str)  # 将学号列转换为字符串类型
+        
+        # 创建一个时间排序映射，保持与self.time_slots相同的顺序
+        time_order_map = {time: i for i, time in enumerate(self.time_slots)}
+        
+        # 添加一个临时排序列
+        schedule_df['排序'] = schedule_df['时间'].map(time_order_map)
+        
+        # 按照时间顺序排序
+        schedule_df = schedule_df.sort_values('排序')
+        
+        # 删除临时排序列
+        schedule_df = schedule_df.drop('排序', axis=1)
+        
+        # 确保学号是字符串类型
+        schedule_df['学号'] = schedule_df['学号'].astype(str)
         
         # 保存到Excel，设置学号列的格式为文本
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -209,11 +251,11 @@ class IntervieweeScheduler:
                 'FFE6F2',  # 浅粉
             ]
             
-            # 为每个时间段分配颜色
-            time_slots = sorted(set(schedule_df['时间']))
+            # 为每个时间段分配颜色，确保按照配置文件中的顺序
+            # 使用自定义顺序来确保颜色分配与时间顺序一致
             color_map = {
                 time_slot: light_colors[i % len(light_colors)]
-                for i, time_slot in enumerate(time_slots)
+                for i, time_slot in enumerate(self.time_slots)
             }
             
             # 设置所有单元格的边框、对齐方式和背景颜色
@@ -273,6 +315,7 @@ def main():
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
         interviewee_config = config['interviewee_config']
+        interviewer_config = config.get('interviewer_config', {})
     except FileNotFoundError:
         print("错误：找不到配置文件 config.json")
         sys.exit(1)
@@ -292,8 +335,15 @@ def main():
     # 获取时间段权重
     slot_weights = interviewee_config.get('slot_weights')
     
+    # 从面试官配置中获取时间顺序
+    time_order = None
+    if interviewer_config and 'time_locations' in interviewer_config:
+        # 直接使用time_locations的键顺序
+        time_order = list(interviewer_config['time_locations'].keys())
+        print(f"从interviewer_config['time_locations']读取的时间顺序: {time_order}")
+    
     # 创建IntervieweeScheduler实例并执行
-    scheduler = IntervieweeScheduler(input_file, slot_weights)
+    scheduler = IntervieweeScheduler(input_file, slot_weights, time_order)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')
