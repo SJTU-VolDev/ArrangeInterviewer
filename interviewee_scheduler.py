@@ -17,23 +17,23 @@ class IntervieweeScheduler:
         self.slot_weights = slot_weights  # 时间段权重参数
         self.time_order = time_order  # 时间段顺序参数
         
-    def identify_columns(self) -> Tuple[str, str, str]:
+    def identify_columns(self) -> Tuple[str, str, str, str]:
         """识别包含关键信息的列名"""
         df = pd.read_excel(self.input_file)
         name_col = next(col for col in df.columns if '姓名' in col)
         student_id_col = next(col for col in df.columns if '学号' in col)
+        account_col = next(col for col in df.columns if '账号' in col)
         time_col = next(col for col in df.columns if '面试' in col)
-        return name_col, student_id_col, time_col
+        return name_col, student_id_col, account_col, time_col
     
     def extract_time_slots(self, time_str: str) -> List[str]:
-        """从时间字符串中提取所有时间段"""
         if pd.isna(time_str):
             return []
         return [t.strip() for t in str(time_str).split('、')]
     
     def process_data(self):
         """处理输入数据，收集所有可用时间段"""
-        name_col, student_id_col, time_col = self.identify_columns()
+        name_col, student_id_col, account_col, time_col = self.identify_columns()
         self.df = pd.read_excel(self.input_file)
         
         # 收集所有时间段
@@ -68,8 +68,9 @@ class IntervieweeScheduler:
         for _, row in self.df.iterrows():
             name = row[name_col]
             student_id = row[student_id_col]
+            account = row[account_col]
             time_slots = self.extract_time_slots(row[time_col])
-            self.student_available_times[(name, student_id)] = time_slots
+            self.student_available_times[(name, student_id, account)] = time_slots
     
     def assign_time_slots(self):
         """为每个学生分配时间段，根据权重确保时间段分配比例"""
@@ -108,11 +109,11 @@ class IntervieweeScheduler:
         for time_slot in self.time_slots:
             assigned = False
             # 寻找可以在这个时间段面试的学生
-            for (name, student_id), available_times in students_by_availability:
-                if (name, student_id) not in assigned_students and time_slot in available_times:
-                    self.time_slot_assignments[time_slot].append((name, student_id))
+            for (name, student_id, account), available_times in students_by_availability:
+                if (name, student_id, account) not in assigned_students and time_slot in available_times:
+                    self.time_slot_assignments[time_slot].append((name, student_id, account))
                     slot_assignments[time_slot] += 1
-                    assigned_students.add((name, student_id))
+                    assigned_students.add((name, student_id, account))
                     assigned = True
                     break
             
@@ -120,8 +121,8 @@ class IntervieweeScheduler:
                 log_messages.append(f"警告：时间段 {time_slot} 没有找到可用的学生！")
         
         # 第二轮：根据权重分配剩余的学生
-        for (name, student_id), available_times in students_by_availability:
-            if (name, student_id) in assigned_students:
+        for (name, student_id, account), available_times in students_by_availability:
+            if (name, student_id, account) in assigned_students:
                 continue
                 
             # 在该学生的可用时间段中找最需要人的时间段
@@ -138,11 +139,11 @@ class IntervieweeScheduler:
                     best_slot = time_slot
             
             if best_slot:
-                self.time_slot_assignments[best_slot].append((name, student_id))
+                self.time_slot_assignments[best_slot].append((name, student_id, account))
                 slot_assignments[best_slot] += 1
-                assigned_students.add((name, student_id))
+                assigned_students.add((name, student_id, account))
             else:
-                unassigned_students.append((name, student_id))
+                unassigned_students.append((name, student_id, account))
         
         # 输出分配结果统计，严格按照配置文件中的时间顺序
         log_messages.append("\n时间段分配情况：")
@@ -156,10 +157,10 @@ class IntervieweeScheduler:
         # 处理未分配的学生
         if unassigned_students:
             log_messages.append(f"\n警告：有 {len(unassigned_students)} 名学生未能按照其可用时间段分配：")
-            for name, student_id in unassigned_students:
-                log_messages.append(f"- {name} ({student_id})")
+            for name, student_id, account in unassigned_students:
+                log_messages.append(f"- {name} ({student_id}) [{account}]")
                 # 输出这些学生的可用时间段，方便手动调整
-                available_times = self.student_available_times[(name, student_id)]
+                available_times = self.student_available_times[(name, student_id, account)]
                 # 按照配置文件中的时间顺序排序可用时间段
                 sorted_available_times = sorted(
                     available_times,
@@ -192,11 +193,12 @@ class IntervieweeScheduler:
         for time_slot in self.time_slots:
             assignments = self.time_slot_assignments[time_slot]
             if assignments:
-                for name, student_id in sorted(assignments):
+                for name, student_id, account in sorted(assignments):
                     schedule_data.append({
                         '时间': time_slot,
                         '姓名': name,
-                        '学号': str(student_id)  # 确保学号是字符串类型
+                        '学号': str(student_id),
+                        '账号': account
                     })
         
         # 创建DataFrame，并指定学号列为字符串类型
@@ -233,7 +235,7 @@ class IntervieweeScheduler:
             
             # 设置标题行格式
             bold_font = Font(bold=True)
-            for col in range(1, 4):  # A, B, C三列
+            for col in range(1, 5):  # A, B, C, D四列
                 cell = worksheet.cell(row=1, column=col)
                 cell.font = bold_font
             
@@ -267,7 +269,7 @@ class IntervieweeScheduler:
             )
             
             # 设置标题行
-            for col in range(1, 4):
+            for col in range(1, 5):
                 cell = worksheet.cell(row=1, column=col)
                 cell.border = thin_border
                 cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -282,7 +284,7 @@ class IntervieweeScheduler:
                                  fill_type='solid')
                 
                 # 为该行的所有单元格设置格式
-                for col in range(1, 4):
+                for col in range(1, 5):
                     cell = worksheet.cell(row=row, column=col)
                     cell.border = thin_border
                     cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -308,6 +310,7 @@ class IntervieweeScheduler:
             worksheet.column_dimensions['A'].width = 15  # 时间列
             worksheet.column_dimensions['B'].width = 12  # 姓名列
             worksheet.column_dimensions['C'].width = 15  # 学号列
+            worksheet.column_dimensions['D'].width = 15  # 账号列
 
 def main():
     # 读取配置文件
@@ -349,4 +352,4 @@ def main():
     scheduler.save_schedule('output/interviewee_schedule.xlsx')
 
 if __name__ == "__main__":
-    main() 
+    main()
