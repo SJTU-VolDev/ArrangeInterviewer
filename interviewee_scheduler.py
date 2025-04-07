@@ -15,7 +15,7 @@ class IntervieweeScheduler:
         self.time_slots = []  # 改为列表，不是集合
         self.time_slot_assignments = defaultdict(list)
         self.slot_weights = slot_weights  # 时间段权重参数
-        self.time_order = time_order  # 时间段顺序参数
+        # 移除对time_order的依赖
         
     def identify_columns(self) -> Tuple[str, str, str, str]:
         """识别包含关键信息的列名"""
@@ -42,26 +42,11 @@ class IntervieweeScheduler:
             time_slots = self.extract_time_slots(row[time_col])
             all_time_slots.update(time_slots)
         
+        # 简化输出
         print(f"从Excel中收集到的所有时间段: {sorted(all_time_slots)}")
-        print(f"配置文件中的时间顺序: {self.time_order}")
         
-        # 按照配置文件中的时间顺序初始化时间段列表
-        if self.time_order:
-            # 仅保留配置文件中有且Excel中也有的时间段，保持原始顺序
-            self.time_slots = [t for t in self.time_order if t in all_time_slots]
-            
-            # 检查是否有时间段在Excel中存在但在配置文件中没有指定
-            missing_in_config = [t for t in all_time_slots if t not in self.time_order]
-            if missing_in_config:
-                print(f"警告：以下时间段在Excel中存在但在配置文件中未指定: {missing_in_config}")
-                # 添加这些时间段到列表末尾，以字母顺序排序
-                self.time_slots.extend(sorted(missing_in_config))
-        else:
-            # 如果没有配置文件时间顺序，则按字母顺序排列
-            self.time_slots = sorted(all_time_slots)
-            print("没有从配置文件获取到时间顺序，使用默认排序。")
-        
-        print(f"最终使用的时间段顺序: {self.time_slots}")
+        # 直接使用Excel中的时间段，按字母顺序排列
+        self.time_slots = sorted(all_time_slots)
         
         # 为每个学生收集可用时间段
         self.student_available_times = {}
@@ -318,7 +303,6 @@ def main():
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
         interviewee_config = config['interviewee_config']
-        interviewer_config = config.get('interviewer_config', {})
     except FileNotFoundError:
         print("错误：找不到配置文件 config.json")
         sys.exit(1)
@@ -338,15 +322,8 @@ def main():
     # 获取时间段权重
     slot_weights = interviewee_config.get('slot_weights')
     
-    # 从面试官配置中获取时间顺序
-    time_order = None
-    if interviewer_config and 'time_locations' in interviewer_config:
-        # 直接使用time_locations的键顺序
-        time_order = list(interviewer_config['time_locations'].keys())
-        print(f"从interviewer_config['time_locations']读取的时间顺序: {time_order}")
-    
     # 创建IntervieweeScheduler实例并执行
-    scheduler = IntervieweeScheduler(input_file, slot_weights, time_order)
+    scheduler = IntervieweeScheduler(input_file, slot_weights)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')
