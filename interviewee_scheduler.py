@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Font, Border, Side
 from openpyxl.styles import PatternFill
 import json
 import os
+import re
 
 class IntervieweeScheduler:
     def __init__(self, input_file: str, slot_weights: List[int] = None, time_order: List[str] = None):
@@ -45,8 +46,9 @@ class IntervieweeScheduler:
         # 简化输出
         print(f"从Excel中收集到的所有时间段: {sorted(all_time_slots)}")
         
-        # 直接使用Excel中的时间段，按字母顺序排列
-        self.time_slots = sorted(all_time_slots)
+        # 按照日期的自然顺序排列时间段
+        self.time_slots = self.sort_time_slots_by_date(all_time_slots)
+        print(f"按照日期顺序排序后的时间段: {self.time_slots}")
         
         # 为每个学生收集可用时间段
         self.student_available_times = {}
@@ -56,6 +58,47 @@ class IntervieweeScheduler:
             account = row[account_col]
             time_slots = self.extract_time_slots(row[time_col])
             self.student_available_times[(name, student_id, account)] = time_slots
+    
+    def sort_time_slots_by_date(self, time_slots):
+        """
+        根据日期对时间段进行排序
+        格式可能是: '4月9日 周三 18:00 - 20:00'
+        """
+        # 创建一个月份映射表，将中文月份转换为数字
+        month_map = {'一月': 1, '二月': 2, '三月': 3, '四月': 4, '五月': 5, '六月': 6, 
+                     '七月': 7, '八月': 8, '九月': 9, '十月': 10, '十一月': 11, '十二月': 12,
+                     '1月': 1, '2月': 2, '3月': 3, '4月': 4, '5月': 5, '6月': 6, 
+                     '7月': 7, '8月': 8, '9月': 9, '10月': 10, '11月': 11, '12月': 12}
+        
+        # 创建一个时间段排序的键函数
+        def get_sort_key(time_slot):
+            # 提取月份和日期
+            month_pattern = r'(\d+)月'
+            day_pattern = r'(\d+)日'
+            hour_pattern = r'(\d+):(\d+)'
+            
+            # 提取月份（默认为1）
+            month_match = re.search(month_pattern, time_slot)
+            month = int(month_match.group(1)) if month_match else 1
+            
+            # 提取日期（默认为1）
+            day_match = re.search(day_pattern, time_slot)
+            day = int(day_match.group(1)) if day_match else 1
+            
+            # 提取开始时间的小时和分钟
+            hour_matches = re.findall(hour_pattern, time_slot)
+            if hour_matches and len(hour_matches) >= 1:
+                hour = int(hour_matches[0][0])
+                minute = int(hour_matches[0][1])
+            else:
+                hour = 0
+                minute = 0
+            
+            # 返回排序键（月，日，时，分）
+            return (month, day, hour, minute)
+        
+        # 使用自定义排序键对时间段进行排序
+        return sorted(time_slots, key=get_sort_key)
     
     def assign_time_slots(self):
         """为每个学生分配时间段，根据权重确保时间段分配比例"""
