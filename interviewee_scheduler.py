@@ -202,6 +202,8 @@ class IntervieweeScheduler:
     def save_log(self, log_messages: List[str]):
         """保存日志信息到文件"""
         log_file = 'output/interviewee_schedule_log.txt'
+        # 确保日志目录存在，避免 FileNotFoundError
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
         with open(log_file, 'w', encoding='utf-8') as f:
             f.write("面试时间安排 - 执行日志\n")
             f.write("=" * 50 + "\n\n")
@@ -215,6 +217,10 @@ class IntervieweeScheduler:
     
     def save_schedule(self, output_file: str):
         """保存排班表到Excel文件，并合并相同时间单元格"""
+        # 确保输出目录存在，避免因目录不存在导致写入失败
+        out_dir = os.path.dirname(output_file)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         # 准备数据，确保按照配置文件中的时间顺序
         schedule_data = []
         # 按照指定的时间顺序处理

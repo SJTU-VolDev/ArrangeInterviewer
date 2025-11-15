@@ -128,6 +128,14 @@
 - Python 3.7 或更高版本
 - pip 包管理器
 
+### 配置Python虚拟环境（可选但推荐）
+
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux 或 macOS
+# .\venv\Scripts\Activate.ps1   # Windows
+```
+
 ### 安装依赖
 
 1. 克隆或下载本项目到本地
@@ -155,6 +163,7 @@ pip install -r requirements.txt
 
    - 复制示例配置文件或创建新的 `config.json`
    - 根据实际需求修改配置项
+
 2. 运行面试官和场务排表程序：
 
 ```bash
