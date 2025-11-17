@@ -10,7 +10,7 @@ import os
 import re
 
 class IntervieweeScheduler:
-    def __init__(self, input_file: str, slot_weights: List[int] = None, time_slots: List[str] = None):
+    def __init__(self, input_file: str, slot_weights: List[int] = None, time_slots: List[str] = None, key_words: List[str] = None, interview_time_column: str = None, online_interview_column: str = None):
         self.input_file = input_file
         self.df = None
         self.time_slots = []  # 改为列表，不是集合
@@ -19,24 +19,34 @@ class IntervieweeScheduler:
         self.offline_assignments = defaultdict(list)  # 线下面试分配
         self.slot_weights = slot_weights  # 时间段权重参数
         self.configured_time_slots = time_slots  # 从配置文件读取的时间段顺序
+        # 初始化关键字段，使用默认值作为后备
+        self.key_words = ["姓名", "学号", "账号"]  # 默认关键字段
+        if key_words:
+            self.key_words = key_words  # 使用配置文件中的值
+        self.interview_time_column = interview_time_column or "面试时间"
+        self.online_interview_column = online_interview_column or "线上面试"
         
-    def identify_columns(self) -> Tuple[str, str, str, str, str]:
-        """识别包含关键信息的列名，包括线上面试列"""
+    def identify_columns(self) -> Tuple[str, List[str], str, str]:
+        """识别包含关键信息的列名，返回关键字段列的列表，以及时间列和线上面试列"""
         df = pd.read_excel(self.input_file)
 
-        name_col = next(col for col in df.columns if '姓名' in col)
-        student_id_col = next(col for col in df.columns if '学号' in col)
-        account_col = next(col for col in df.columns if '账号' in col)
-        time_col = next(col for col in df.columns if '面试时间' in col)
+        # 根据key_words找到对应的列名
+        key_word_cols = []
+        for keyword in self.key_words:
+            col = next(col for col in df.columns if keyword in col)
+            key_word_cols.append(col)
 
-        # 检查是否存在"线上面试"相关的列
+        # 找到时间列
+        time_col = next(col for col in df.columns if self.interview_time_column in col)
+
+        # 检查是否存在线上面试相关的列
         online_col = None
         for col in df.columns:
-            if '线上面试' in col:
+            if self.online_interview_column in col:
                 online_col = col
                 break
 
-        return name_col, student_id_col, account_col, time_col, online_col
+        return key_word_cols[0], key_word_cols[1:], time_col, online_col
     
     def extract_time_slots(self, time_str: str) -> List[str]:
         if pd.isna(time_str):
@@ -45,7 +55,7 @@ class IntervieweeScheduler:
 
     def process_data(self):
         """处理输入数据，收集所有可用时间段"""
-        name_col, student_id_col, account_col, time_col, online_col = self.identify_columns()
+        name_col, other_cols, time_col, online_col = self.identify_columns()
         self.df = pd.read_excel(self.input_file)
 
         # 收集所有时间段
@@ -107,28 +117,33 @@ class IntervieweeScheduler:
         self.offline_students = set()  # 存储需要线下面试的学生
 
         for _, row in self.df.iterrows():
+            # 获取姓名字段
             name = row[name_col]
-            student_id = row[student_id_col]
-            account = row[account_col]
+            # 获取其他关键字段
+            other_values = tuple(row[col] for col in other_cols)
+            # 获取时间字段
             time_slots = self.extract_time_slots(row[time_col])
+
+            # 使用姓名和其他关键字段作为标识符
+            student_key = (name,) + other_values
 
             # 如果存在线上面试列，则检查该学生是否需要线上面试
             if has_online_col:
                 online_value = str(row[online_col]).strip() if not pd.isna(row[online_col]) else ""
                 # 判断是否为"是"，包括常见的变体
                 if online_value in ['是', '是 ', ' Yes', 'yes', 'YES', '1', 'true', 'True', 'TRUE']:
-                    self.student_available_times[(name, student_id, account)] = time_slots
-                    self.online_students.add((name, student_id, account))
-                    print(f"学生 {name}({student_id}) - 线上面试")
+                    self.student_available_times[student_key] = time_slots
+                    self.online_students.add(student_key)
+                    print(f"学生 {student_key[0]}({student_key[1] if len(student_key) > 1 else 'N/A'}) - 线上面试")
                 else:
-                    self.student_available_times[(name, student_id, account)] = time_slots
-                    self.offline_students.add((name, student_id, account))
-                    print(f"学生 {name}({student_id}) - 线下面试")
+                    self.student_available_times[student_key] = time_slots
+                    self.offline_students.add(student_key)
+                    print(f"学生 {student_key[0]}({student_key[1] if len(student_key) > 1 else 'N/A'}) - 线下面试")
             else:
                 # 传统模式：所有学生都进行线下面试
-                self.student_available_times[(name, student_id, account)] = time_slots
-                self.offline_students.add((name, student_id, account))
-                print(f"学生 {name}({student_id}) - 线下面试 (传统模式)")
+                self.student_available_times[student_key] = time_slots
+                self.offline_students.add(student_key)
+                print(f"学生 {student_key[0]}({student_key[1] if len(student_key) > 1 else 'N/A'}) - 线下面试 (传统模式)")
     
     def sort_time_slots_by_date(self, time_slots):
         """
@@ -226,11 +241,11 @@ class IntervieweeScheduler:
         for time_slot in self.time_slots:
             assigned = False
             # 寻找可以在这个时间段面试的学生
-            for (name, student_id, account), available_times in students_by_availability:
-                if (name, student_id, account) not in assigned_students and time_slot in available_times:
-                    assignment_dict[time_slot].append((name, student_id, account))
+            for student_key, available_times in students_by_availability:
+                if student_key not in assigned_students and time_slot in available_times:
+                    assignment_dict[time_slot].append(student_key)
                     slot_assignments[time_slot] += 1
-                    assigned_students.add((name, student_id, account))
+                    assigned_students.add(student_key)
                     assigned = True
                     break
 
@@ -238,8 +253,8 @@ class IntervieweeScheduler:
                 log_messages.append(f"警告：{group_name}时间段 {time_slot} 没有找到可用的学生！")
 
         # 第二轮：根据权重分配剩余的学生
-        for (name, student_id, account), available_times in students_by_availability:
-            if (name, student_id, account) in assigned_students:
+        for student_key, available_times in students_by_availability:
+            if student_key in assigned_students:
                 continue
 
             # 在该学生的可用时间段中找最需要人的时间段
@@ -256,11 +271,11 @@ class IntervieweeScheduler:
                     best_slot = time_slot
 
             if best_slot:
-                assignment_dict[best_slot].append((name, student_id, account))
+                assignment_dict[best_slot].append(student_key)
                 slot_assignments[best_slot] += 1
-                assigned_students.add((name, student_id, account))
+                assigned_students.add(student_key)
             else:
-                unassigned_students.append((name, student_id, account))
+                unassigned_students.append(student_key)
 
         # 输出分配结果统计，严格按照配置文件中的时间顺序
         log_messages.append(f"\n{group_name}时间段分配情况：")
@@ -274,10 +289,12 @@ class IntervieweeScheduler:
         # 处理未分配的学生
         if unassigned_students:
             log_messages.append(f"\n警告：有 {len(unassigned_students)} 名{group_name}学生未能按照其可用时间段分配：")
-            for name, student_id, account in unassigned_students:
-                log_messages.append(f"- {name} ({student_id}) [{account}]")
+            for student_key in unassigned_students:
+                name = student_key[0]
+                other_values = student_key[1:]
+                log_messages.append(f"- {name} ({', '.join(map(str, other_values))})")
                 # 输出这些学生的可用时间段，方便手动调整
-                available_times = self.student_available_times[(name, student_id, account)]
+                available_times = self.student_available_times[student_key]
                 # 按照配置文件中的时间顺序排序可用时间段
                 sorted_available_times = sorted(
                     available_times,
@@ -316,25 +333,39 @@ class IntervieweeScheduler:
         for time_slot in self.time_slots:
             assignments = self.online_assignments[time_slot]
             if assignments:
-                for name, student_id, account in sorted(assignments):
-                    online_schedule_data.append({
-                        '时间': time_slot,
-                        '姓名': name,
-                        '学号': str(student_id),
-                        '账号': account
-                    })
+                for student_key in sorted(assignments):
+                    # 解构学生关键字段，第一个是姓名，其余的是其他字段
+                    name = student_key[0]
+                    other_values = student_key[1:]
+
+                    # 创建行数据，包含时间和所有关键字段
+                    row_data = {'时间': time_slot}
+
+                    # 添加所有关键字段 using the configuration key_words as column names
+                    for i, (key_word, value) in enumerate(zip(self.key_words, [name] + list(other_values))):
+                        # Use the actual keyword as the column name in the output
+                        row_data[key_word] = str(value)
+
+                    online_schedule_data.append(row_data)
 
         # 为线下面试准备数据
         for time_slot in self.time_slots:
             assignments = self.offline_assignments[time_slot]
             if assignments:
-                for name, student_id, account in sorted(assignments):
-                    offline_schedule_data.append({
-                        '时间': time_slot,
-                        '姓名': name,
-                        '学号': str(student_id),
-                        '账号': account
-                    })
+                for student_key in sorted(assignments):
+                    # 解构学生关键字段，第一个是姓名，其余的是其他字段
+                    name = student_key[0]
+                    other_values = student_key[1:]
+
+                    # 创建行数据，包含时间和所有关键字段
+                    row_data = {'时间': time_slot}
+
+                    # 添加所有关键字段 using the configuration key_words as column names
+                    for i, (key_word, value) in enumerate(zip(self.key_words, [name] + list(other_values))):
+                        # Use the actual keyword as the column name in the output
+                        row_data[key_word] = str(value)
+
+                    offline_schedule_data.append(row_data)
 
         # 创建DataFrames，并指定学号列为字符串类型
         online_df = pd.DataFrame(online_schedule_data)
@@ -349,13 +380,18 @@ class IntervieweeScheduler:
                 online_df['排序'] = online_df['时间'].map(time_order_map)
                 online_df = online_df.sort_values('排序')
                 online_df = online_df.drop('排序', axis=1)
-                online_df['学号'] = online_df['学号'].astype(str)
+
+                # 确保学号列为字符串类型 (if 学号 column exists)
+                for col_name in online_df.columns:
+                    if '学号' in col_name or col_name == '学号':
+                        online_df[col_name] = online_df[col_name].astype(str)
 
                 online_df.to_excel(writer, index=False, sheet_name='线上面试分配')
                 self._format_worksheet(writer, '线上面试分配', online_df)
             else:
                 # 如果没有线上面试数据，创建一个空的sheet
-                empty_df = pd.DataFrame(columns=['时间', '姓名', '学号', '账号'])
+                empty_columns = ['时间'] + self.key_words
+                empty_df = pd.DataFrame(columns=empty_columns)
                 empty_df.to_excel(writer, index=False, sheet_name='线上面试分配')
                 self._format_worksheet(writer, '线上面试分配', empty_df)
 
@@ -366,13 +402,18 @@ class IntervieweeScheduler:
                 offline_df['排序'] = offline_df['时间'].map(time_order_map)
                 offline_df = offline_df.sort_values('排序')
                 offline_df = offline_df.drop('排序', axis=1)
-                offline_df['学号'] = offline_df['学号'].astype(str)
+
+                # 确保学号列为字符串类型 (if 学号 column exists)
+                for col_name in offline_df.columns:
+                    if '学号' in col_name or col_name == '学号':
+                        offline_df[col_name] = offline_df[col_name].astype(str)
 
                 offline_df.to_excel(writer, index=False, sheet_name='线下面试分配')
                 self._format_worksheet(writer, '线下面试分配', offline_df)
             else:
                 # 如果没有线下面试数据，创建一个空的sheet
-                empty_df = pd.DataFrame(columns=['时间', '姓名', '学号', '账号'])
+                empty_columns = ['时间'] + self.key_words
+                empty_df = pd.DataFrame(columns=empty_columns)
                 empty_df.to_excel(writer, index=False, sheet_name='线下面试分配')
                 self._format_worksheet(writer, '线下面试分配', empty_df)
 
@@ -380,16 +421,24 @@ class IntervieweeScheduler:
         """格式化工作表"""
         worksheet = writer.sheets[sheet_name]
         max_row = len(df) + 1  # 加1是因为有标题行
+        max_col = len(df.columns) if len(df) > 0 else 4  # 根据实际列数调整
 
-        # 设置学号列为文本格式
-        if len(df) > 0:  # 如果DataFrame不为空
+        # 设置学号列为文本格式 (通常是第3列，即索引2)
+        # 查找学号列的列号
+        student_id_col_index = None
+        for i, col_name in enumerate(df.columns):
+            if col_name == '学号':
+                student_id_col_index = i + 1  # Excel列索引从1开始
+                break
+
+        if student_id_col_index and len(df) > 0:  # 如果DataFrame不为空且找到学号列
             for row in range(2, max_row + 1):
-                cell = worksheet.cell(row=row, column=3)  # 第3列是学号列
+                cell = worksheet.cell(row=row, column=student_id_col_index)
                 cell.number_format = '@'  # 设置单元格格式为文本
 
         # 设置标题行格式
         bold_font = Font(bold=True)
-        for col in range(1, 5):  # A, B, C, D四列
+        for col in range(1, max_col + 1):  # 根据实际列数设置
             cell = worksheet.cell(row=1, column=col)
             cell.font = bold_font
 
@@ -423,7 +472,7 @@ class IntervieweeScheduler:
         )
 
         # 设置标题行
-        for col in range(1, 5):
+        for col in range(1, max_col + 1):
             cell = worksheet.cell(row=1, column=col)
             cell.border = thin_border
             cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -440,13 +489,13 @@ class IntervieweeScheduler:
                                      fill_type='solid')
 
                     # 为该行的所有单元格设置格式
-                    for col in range(1, 5):
+                    for col in range(1, max_col + 1):
                         cell = worksheet.cell(row=row, column=col)
                         cell.border = thin_border
                         cell.alignment = Alignment(horizontal='center', vertical='center')
                         cell.fill = fill
 
-            # 合并相同时间的单元格
+            # 合并相同时间的单元格（只合并时间列）
             current_time = None
             time_start_row = 2
 
@@ -462,11 +511,18 @@ class IntervieweeScheduler:
             if time_start_row < max_row and time_start_row <= max_row - 1:
                 worksheet.merge_cells(f'A{time_start_row}:A{max_row}')
 
-        # 调整列宽
-        worksheet.column_dimensions['A'].width = 15  # 时间列
-        worksheet.column_dimensions['B'].width = 12  # 姓名列
-        worksheet.column_dimensions['C'].width = 15  # 学号列
-        worksheet.column_dimensions['D'].width = 15  # 账号列
+        # 调整列宽 - 基于实际列数
+        worksheet.column_dimensions['A'].width = 20  # 时间列
+        if len(df.columns) > 1:
+            worksheet.column_dimensions['B'].width = 12  # 姓名列
+        if len(df.columns) > 2:
+            worksheet.column_dimensions['C'].width = 15  # 学号列
+        if len(df.columns) > 3:
+            worksheet.column_dimensions['D'].width = 15  # 账号列
+        # 为额外列设置默认宽度
+        for i in range(5, max_col + 1):  # E, F, G...
+            col_letter = chr(64 + i)  # 65 is 'A', 66 is 'B', etc.
+            worksheet.column_dimensions[col_letter].width = 15
 
     def save_log(self, log_messages: List[str]):
         """保存日志信息到文件，分别记录线上和线下分配情况"""
@@ -524,12 +580,15 @@ def main():
         print(f"错误：找不到输入文件 {input_file}")
         sys.exit(1)
 
-    # 获取时间段权重和时间槽配置
+    # 获取时间段权重、时间槽配置和关键字段配置
     slot_weights = interviewee_config.get('slot_weights')
     time_slots = interviewee_config.get('time_slots')
+    key_words = interviewee_config.get('key_words')
+    interview_time_column = interviewee_config.get('interview_time_column')
+    online_interview_column = interviewee_config.get('online_interview_column')
 
     # 创建IntervieweeScheduler实例并执行
-    scheduler = IntervieweeScheduler(input_file, slot_weights, time_slots)
+    scheduler = IntervieweeScheduler(input_file, slot_weights, time_slots, key_words, interview_time_column, online_interview_column)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')

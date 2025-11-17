@@ -64,7 +64,10 @@
             "11月19日晚上（20：00 —22：00）（周三）",
             "11月20日晚上（18：00 —20：00）（周四）",
             "11月20日晚上（20：00 —22：00）（周四）"
-        ]
+        ],
+        "key_words": ["姓名", "学号", "账号","其他工作","备注"],
+        "interview_time_column": "面试时间",
+        "online_interview_column": "线上面试"
     },
     "second_interview_config": {
         "input_file": "tables/second_interviee.xlsx",
