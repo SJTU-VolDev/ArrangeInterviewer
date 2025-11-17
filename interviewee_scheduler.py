@@ -10,7 +10,7 @@ import os
 import re
 
 class IntervieweeScheduler:
-    def __init__(self, input_file: str, slot_weights: List[int] = None, time_order: List[str] = None):
+    def __init__(self, input_file: str, slot_weights: List[int] = None, time_slots: List[str] = None):
         self.input_file = input_file
         self.df = None
         self.time_slots = []  # 改为列表，不是集合
@@ -18,7 +18,7 @@ class IntervieweeScheduler:
         self.online_assignments = defaultdict(list)  # 线上面试分配
         self.offline_assignments = defaultdict(list)  # 线下面试分配
         self.slot_weights = slot_weights  # 时间段权重参数
-        # 移除对time_order的依赖
+        self.configured_time_slots = time_slots  # 从配置文件读取的时间段顺序
         
     def identify_columns(self) -> Tuple[str, str, str, str, str]:
         """识别包含关键信息的列名，包括线上面试列"""
@@ -57,9 +57,42 @@ class IntervieweeScheduler:
         # 简化输出
         print(f"从Excel中收集到的所有时间段: {sorted(all_time_slots)}")
 
-        # 按照日期的自然顺序排列时间段
-        self.time_slots = self.sort_time_slots_by_date(all_time_slots)
-        print(f"按照日期顺序排序后的时间段: {self.time_slots}")
+        # 验证从Excel中读取的时间段是否与配置文件中的时间槽完全匹配
+        if self.configured_time_slots:
+            # 转换为集合方便比对
+            excel_time_slots_set = set(all_time_slots)
+            config_time_slots_set = set(self.configured_time_slots)
+
+            # 检查Excel中的时间是否都在配置中
+            missing_in_config = excel_time_slots_set - config_time_slots_set
+            # 检查配置中的时间是否都在Excel中
+            missing_in_excel = config_time_slots_set - excel_time_slots_set
+
+            if missing_in_config:
+                print(f"错误：Excel表格中包含配置文件中未定义的时间段：{missing_in_config}")
+                print("请检查配置文件和Excel表格，确保时间格式完全一致")
+                sys.exit(1)
+
+            if missing_in_excel:
+                print(f"错误：配置文件中定义的时间段在Excel表格中未找到：{missing_in_excel}")
+                print("请检查配置文件和Excel表格，确保时间格式完全一致")
+                sys.exit(1)
+
+            # 按照配置文件中的顺序设置时间槽
+            self.time_slots = self.configured_time_slots
+            print(f"使用配置文件中定义的时间段顺序: {self.time_slots}")
+
+            # 验证slot_weights与time_slots的数量是否一致
+            if self.slot_weights and len(self.slot_weights) != len(self.time_slots):
+                print(f"错误：slot_weights的数量({len(self.slot_weights)})与time_slots的数量({len(self.time_slots)})不匹配")
+                print(f"slot_weights: {self.slot_weights}")
+                print(f"time_slots: {self.time_slots}")
+                sys.exit(1)
+        else:
+            # 如果没有配置时间槽，使用原来的排序方法
+            print("警告：未在配置文件中找到时间槽配置，使用原有的日期排序方法")
+            self.time_slots = self.sort_time_slots_by_date(all_time_slots)
+            print(f"按照日期顺序排序后的时间段: {self.time_slots}")
 
         # 检查是否有线上面试列
         has_online_col = online_col is not None
@@ -491,11 +524,12 @@ def main():
         print(f"错误：找不到输入文件 {input_file}")
         sys.exit(1)
 
-    # 获取时间段权重
+    # 获取时间段权重和时间槽配置
     slot_weights = interviewee_config.get('slot_weights')
+    time_slots = interviewee_config.get('time_slots')
 
     # 创建IntervieweeScheduler实例并执行
-    scheduler = IntervieweeScheduler(input_file, slot_weights)
+    scheduler = IntervieweeScheduler(input_file, slot_weights, time_slots)
     scheduler.process_data()
     scheduler.assign_time_slots()
     scheduler.save_schedule('output/interviewee_schedule.xlsx')

@@ -55,7 +55,16 @@
     },
     "interviewee_config": {
         "input_file": "tables/interviewee.xlsx",
-        "slot_weights": [6,10,8,9,8,9,12]
+        "slot_weights": [6,10,9,9,8,9,12],
+        "time_slots": [
+            "11月18日晚上（18：00 —20：00）（周二）",
+            "11月18日晚上（20：00 —22：00）（周二）",
+            "11月19日晚上（14：00 —16：00）（周三）",
+            "11月19日晚上（18：00 —20：00）（周三）",
+            "11月19日晚上（20：00 —22：00）（周三）",
+            "11月20日晚上（18：00 —20：00）（周四）",
+            "11月20日晚上（20：00 —22：00）（周四）"
+        ]
     },
     "second_interview_config": {
         "input_file": "tables/second_interviee.xlsx",
