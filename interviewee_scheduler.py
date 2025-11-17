@@ -344,7 +344,11 @@ class IntervieweeScheduler:
                     # 添加所有关键字段 using the configuration key_words as column names
                     for i, (key_word, value) in enumerate(zip(self.key_words, [name] + list(other_values))):
                         # Use the actual keyword as the column name in the output
-                        row_data[key_word] = str(value)
+                        # Convert value to string and handle NaN/None values
+                        if pd.isna(value) or value is None:
+                            row_data[key_word] = ''
+                        else:
+                            row_data[key_word] = str(value)
 
                     online_schedule_data.append(row_data)
 
@@ -363,7 +367,11 @@ class IntervieweeScheduler:
                     # 添加所有关键字段 using the configuration key_words as column names
                     for i, (key_word, value) in enumerate(zip(self.key_words, [name] + list(other_values))):
                         # Use the actual keyword as the column name in the output
-                        row_data[key_word] = str(value)
+                        # Convert value to string and handle NaN/None values
+                        if pd.isna(value) or value is None:
+                            row_data[key_word] = ''
+                        else:
+                            row_data[key_word] = str(value)
 
                     offline_schedule_data.append(row_data)
 
@@ -380,6 +388,9 @@ class IntervieweeScheduler:
                 online_df['排序'] = online_df['时间'].map(time_order_map)
                 online_df = online_df.sort_values('排序')
                 online_df = online_df.drop('排序', axis=1)
+
+                # Replace NaN values with empty strings to prevent "nan" from appearing in output
+                online_df = online_df.fillna('')
 
                 # 确保学号列为字符串类型 (if 学号 column exists)
                 for col_name in online_df.columns:
@@ -402,6 +413,9 @@ class IntervieweeScheduler:
                 offline_df['排序'] = offline_df['时间'].map(time_order_map)
                 offline_df = offline_df.sort_values('排序')
                 offline_df = offline_df.drop('排序', axis=1)
+
+                # Replace NaN values with empty strings to prevent "nan" from appearing in output
+                offline_df = offline_df.fillna('')
 
                 # 确保学号列为字符串类型 (if 学号 column exists)
                 for col_name in offline_df.columns:
