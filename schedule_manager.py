@@ -22,7 +22,8 @@ class ScheduleManager:
         
     def identify_columns(self) -> Tuple[str, str, str, str]:
         """识别包含关键信息的列名"""
-        df = pd.read_excel(self.input_file)
+        # 读取Excel时，将所有列都作为字符串类型，避免某些字段丢失前缀0
+        df = pd.read_excel(self.input_file, dtype=str)
         name_col = next(col for col in df.columns if '姓名' in col)
         dept_col = next(col for col in df.columns if '部门' in col)
         interviewer_col = next(col for col in df.columns if '面试官' in col)
@@ -38,7 +39,8 @@ class ScheduleManager:
     def process_data(self):
         """处理输入数据"""
         name_col, dept_col, interviewer_col, staff_col = self.identify_columns()
-        self.df = pd.read_excel(self.input_file)
+        # 读取Excel时，将所有列都作为字符串类型，避免某些字段丢失前缀0
+        self.df = pd.read_excel(self.input_file, dtype=str)
         
         # 收集所有时间段和对应的人员信息
         for _, row in self.df.iterrows():

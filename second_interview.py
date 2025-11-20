@@ -10,7 +10,8 @@ with open('config.json', 'r', encoding='utf-8') as f:
     interviewer_config = config.get('interviewer_config', {})
 
 # 1. 读取输入文件并初始化部门名单
-df = pd.read_excel(second_interview_config['input_file'])
+# 读取Excel时，将所有列都作为字符串类型，避免某些字段丢失前缀0
+df = pd.read_excel(second_interview_config['input_file'], dtype=str)
 # 保持与Excel表头一致的部门顺序
 dept_order = []
 for col in df.columns:

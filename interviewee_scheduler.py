@@ -28,7 +28,8 @@ class IntervieweeScheduler:
         
     def identify_columns(self) -> Tuple[str, List[str], str, str]:
         """识别包含关键信息的列名，返回关键字段列的列表，以及时间列和线上面试列"""
-        df = pd.read_excel(self.input_file)
+        # 读取Excel时，将所有列都作为字符串类型，避免学号等字段丢失前缀0
+        df = pd.read_excel(self.input_file, dtype=str)
 
         # 根据key_words找到对应的列名
         key_word_cols = []
@@ -56,7 +57,8 @@ class IntervieweeScheduler:
     def process_data(self):
         """处理输入数据，收集所有可用时间段"""
         name_col, other_cols, time_col, online_col = self.identify_columns()
-        self.df = pd.read_excel(self.input_file)
+        # 读取Excel时，将所有列都作为字符串类型，避免学号等字段丢失前缀0
+        self.df = pd.read_excel(self.input_file, dtype=str)
 
         # 收集所有时间段
         all_time_slots = set()

@@ -55,7 +55,7 @@
     },
     "interviewee_config": {
         "input_file": "tables/interviewee.xlsx",
-        "slot_weights": [6,10,9,9,8,9,12],
+        "slot_weights": [1,20,9,9,10,1,12],
         "time_slots": [
             "11月18日晚上（18：00 —20：00）（周二）",
             "11月18日晚上（20：00 —22：00）（周二）",
@@ -65,7 +65,7 @@
             "11月20日晚上（18：00 —20：00）（周四）",
             "11月20日晚上（20：00 —22：00）（周四）"
         ],
-        "key_words": ["姓名", "学号", "账号","其他工作","备注"],
+        "key_words": ["姓名", "学号", "账号", "其他工作", "备注"],
         "interview_time_column": "面试时间",
         "online_interview_column": "线上面试"
     },
