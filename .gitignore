@@ -3,3 +3,5 @@ output/*.txt
 output/*.xlsx
 tables/*.xlsx
 CLAUDE.md
+__pycache__/
+*.pyc

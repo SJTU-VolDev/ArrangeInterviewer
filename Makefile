@@ -1,16 +1,19 @@
-.PHONY: setup interviewer interviewee_1 interviewee_2
+.PHONY: setup run clean
 
-VENV := venv/bin/activate
-REQS := requirements.txt
-
+# 创建虚拟环境并安装依赖
 setup:
-	@if [ ! -d "venv" ]; then python3 -m venv venv && . $(VENV) && pip install -r $(REQS); fi
+	python -m venv .venv
+	.venv/bin/pip install -r requirements.txt
 
-interviewer: setup
-	python3 schedule_manager.py
+# Windows 环境 setup
+setup-win:
+	python -m venv .venv
+	.venv\Scripts\pip install -r requirements.txt
 
-interviewee_1: setup
-	python3 interviewee_scheduler.py
+# 运行排表程序
+run:
+	python main.py
 
-interviewee_2: setup
-	python3 second_interview.py
+# 清理输出文件
+clean:
+	rm -rf output/*
