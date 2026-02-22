@@ -17,6 +17,7 @@ import sys
 from interviewer_parser import InterviewerParser
 from volunteer_parser import VolunteerParser
 from scheduler import Scheduler
+from post_processor import apply_sub_slots, apply_numbering
 from output_generator import OutputGenerator
 
 
@@ -49,6 +50,8 @@ def main():
     slot_weights = config.get("slot_weights")
     key_words = config.get("key_words", ["姓名", "学号", "微信号"])
     interview_time_column = config.get("interview_time_column", "面试时间")
+    sub_slot_minutes = config.get("sub_slot_minutes", False)
+    enable_numbering = config.get("enable_numbering", False)
 
     # ---- 1. 解析面试官信息 ----
     if not os.path.exists(interviewer_file):
@@ -122,7 +125,19 @@ def main():
     )
     scheduler.run()
 
-    # ---- 4. 输出结果 ----
+    # ---- 4. 后处理 ----
+    has_sub_slots = bool(sub_slot_minutes and isinstance(sub_slot_minutes, int) and sub_slot_minutes > 0)
+    has_numbering = bool(enable_numbering)
+
+    if has_sub_slots:
+        print(f"\n执行后处理：分时段（每 {sub_slot_minutes} 分钟）...")
+        apply_sub_slots(scheduler.assignments, sub_slot_minutes, scheduler.log_messages)
+
+    if has_numbering:
+        print("执行后处理：编号...")
+        apply_numbering(scheduler.assignments, scheduler.log_messages)
+
+    # ---- 5. 输出结果 ----
     output_excel = "output/schedule.xlsx"
     output_log = "output/schedule_log.txt"
 
@@ -131,6 +146,8 @@ def main():
         time_slots=time_slots,
         key_words=key_words,
         log_messages=scheduler.log_messages,
+        has_sub_slots=has_sub_slots,
+        has_numbering=has_numbering,
     )
 
     output_gen.save_schedule(output_excel)

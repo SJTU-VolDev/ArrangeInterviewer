@@ -21,6 +21,9 @@ class Assignment:
         self.volunteer = volunteer
         self.time_slot = time_slot
         self.interviewer = interviewer
+        # 后处理阶段填充
+        self.sub_slot: str = ""      # 小时间段（如 "14:00-14:15"）
+        self.number: int = 0         # 编号（同面试官下从1开始）
 
     def __repr__(self) -> str:
         return (

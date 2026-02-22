@@ -2,5 +2,7 @@
     "interviewer_file": "tables/面试官信息.xlsx",
     "volunteer_file": "tables/志愿者总表.xlsx",
     "key_words": ["姓名", "学号", "微信号"],
-    "interview_time_column": "面试时间"
+    "interview_time_column": "面试时间",
+    "sub_slot_minutes": 15,
+    "enable_numbering": true
 }

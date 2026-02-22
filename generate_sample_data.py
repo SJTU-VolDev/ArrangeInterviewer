@@ -6,6 +6,8 @@
 """
 
 import os
+import random
+
 import pandas as pd
 
 os.makedirs("tables", exist_ok=True)
@@ -13,15 +15,16 @@ os.makedirs("tables", exist_ok=True)
 # =======================================================
 # 1. 面试官信息表
 # =======================================================
-# 格式：每列 = 一个时间段，列下逐行列出该时间段的面试官
-# 3个时间段，各列面试官数量可以不同
+# 5 个时间段（带具体日期和小时），面试官有交叉
 interviewer_columns = {
-    "周六上午": ["张明", "李华", "杨帆"],
-    "周六下午": ["王芳", "李华", "赵强"],
-    "周日上午": ["刘洋", "陈静", "赵强", "杨帆"],
+    "3月1日 14:00-17:00": ["张明", "李华", "杨帆", "王芳"],
+    "3月1日 19:00-22:00": ["赵强"],
+    "3月2日 09:00-12:00": ["陈静", "杨帆"],
+    "3月2日 14:00-17:00": ["张明", "刘洋", "陈静"],
+    "3月2日 19:00-21:30": ["王芳", "马飞", "李华", "周磊"],
 }
 
-# 补齐列长度（短的用 None 填充），以便构造 DataFrame
+# 补齐列长度
 max_len = max(len(v) for v in interviewer_columns.values())
 for key in interviewer_columns:
     interviewer_columns[key] += [None] * (max_len - len(interviewer_columns[key]))
@@ -37,30 +40,39 @@ print()
 # =======================================================
 # 2. 志愿者总表
 # =======================================================
-# 20名志愿者，可选时间段各不相同（用顿号分隔）
-# 列名故意用"你的姓名"/"你的学号"等，验证模糊匹配
-volunteer_data = [
-    {"你的姓名": "陈一",   "你的学号": "202500001", "你的微信号": "chenyi_wx",     "你可以参加的面试时间": "周六上午、周六下午、周日上午"},
-    {"你的姓名": "林二",   "你的学号": "202500002", "你的微信号": "liner_wx",      "你可以参加的面试时间": "周六上午、周六下午"},
-    {"你的姓名": "黄三",   "你的学号": "202500003", "你的微信号": "huangsan_wx",   "你可以参加的面试时间": "周六下午、周日上午"},
-    {"你的姓名": "周四",   "你的学号": "202500004", "你的微信号": "zhousi_wx",     "你可以参加的面试时间": "周六上午"},
-    {"你的姓名": "吴五",   "你的学号": "202500005", "你的微信号": "wuwu_wx",       "你可以参加的面试时间": "周日上午"},
-    {"你的姓名": "郑六",   "你的学号": "202500006", "你的微信号": "zhengliu_wx",   "你可以参加的面试时间": "周六上午、周日上午"},
-    {"你的姓名": "孙七",   "你的学号": "202500007", "你的微信号": "sunqi_wx",      "你可以参加的面试时间": "周六下午"},
-    {"你的姓名": "马八",   "你的学号": "202500008", "你的微信号": "maba_wx",       "你可以参加的面试时间": "周六上午、周六下午、周日上午"},
-    {"你的姓名": "胡九",   "你的学号": "202500009", "你的微信号": "hujiu_wx",      "你可以参加的面试时间": "周六上午、周六下午"},
-    {"你的姓名": "朱十",   "你的学号": "202500010", "你的微信号": "zhushi_wx",     "你可以参加的面试时间": "周日上午"},
-    {"你的姓名": "何十一", "你的学号": "202500011", "你的微信号": "heshiyi_wx",    "你可以参加的面试时间": "周六上午、周日上午"},
-    {"你的姓名": "罗十二", "你的学号": "202500012", "你的微信号": "luoshier_wx",   "你可以参加的面试时间": "周六下午、周日上午"},
-    {"你的姓名": "梁十三", "你的学号": "202500013", "你的微信号": "liangshisan_wx","你可以参加的面试时间": "周六上午、周六下午"},
-    {"你的姓名": "宋十四", "你的学号": "202500014", "你的微信号": "songshisi_wx",  "你可以参加的面试时间": "周六上午"},
-    {"你的姓名": "唐十五", "你的学号": "202500015", "你的微信号": "tangshiwu_wx",  "你可以参加的面试时间": "周六下午、周日上午"},
-    {"你的姓名": "韩十六", "你的学号": "202500016", "你的微信号": "hanshiliu_wx",  "你可以参加的面试时间": "周六上午、周六下午、周日上午"},
-    {"你的姓名": "冯十七", "你的学号": "202500017", "你的微信号": "fengshiqi_wx",  "你可以参加的面试时间": "周日上午"},
-    {"你的姓名": "董十八", "你的学号": "202500018", "你的微信号": "dongshiba_wx",  "你可以参加的面试时间": "周六上午、周六下午"},
-    {"你的姓名": "程十九", "你的学号": "202500019", "你的微信号": "chengshijiu_wx","你可以参加的面试时间": "周六下午"},
-    {"你的姓名": "曹二十", "你的学号": "202500020", "你的微信号": "caoershi_wx",   "你可以参加的面试时间": "周六上午、周日上午"},
+# 60 名志愿者，可选时间段随机生成（1~4 个），覆盖各种组合
+
+time_slot_list = list(interviewer_columns.keys())
+
+# 百家姓 + 数字编号
+surnames = [
+    "陈", "林", "黄", "周", "吴", "郑", "孙", "马", "胡", "朱",
+    "何", "罗", "梁", "宋", "唐", "韩", "冯", "董", "程", "曹",
+    "袁", "邓", "许", "傅", "沈", "曾", "彭", "吕", "苏", "卢",
+    "蒋", "蔡", "贾", "丁", "魏", "薛", "叶", "阎", "余", "潘",
+    "杜", "戴", "夏", "钟", "汪", "田", "任", "姜", "范", "方",
+    "石", "姚", "谭", "廖", "邹", "熊", "金", "陆", "郝", "孔",
 ]
+
+random.seed(42)  # 可复现
+
+volunteer_data = []
+for i in range(240):
+    name = surnames[i % len(surnames)] + f"同学{i + 1:02d}"
+    student_id = f"20250{i + 1:04d}"
+    wechat = f"vol{i + 1:02d}_wx"
+
+    # 随机选 1~4 个时间段
+    n_slots = random.randint(1, min(4, len(time_slot_list)))
+    chosen_slots = random.sample(time_slot_list, n_slots)
+    time_str = "、".join(chosen_slots)
+
+    volunteer_data.append({
+        "你的姓名": name,
+        "你的学号": student_id,
+        "你的微信号": wechat,
+        "你可以参加的面试时间": time_str,
+    })
 
 df_volunteer = pd.DataFrame(volunteer_data)
 df_volunteer.to_excel("tables/志愿者总表.xlsx", index=False)
@@ -68,7 +80,9 @@ print("✅ 已生成 tables/志愿者总表.xlsx")
 print(f"   列名: {list(df_volunteer.columns)}")
 print(f"   志愿者数: {len(df_volunteer)}")
 print()
-print(df_volunteer.to_string(index=False))
+# 只打印前 10 行
+print(df_volunteer.head(10).to_string(index=False))
+print(f"   ... 共 {len(df_volunteer)} 行")
 
 # =======================================================
 # 统计概览
@@ -76,18 +90,15 @@ print(df_volunteer.to_string(index=False))
 print("\n" + "=" * 50)
 print("数据概览:")
 print("=" * 50)
-# 统计各时间段可用志愿者人数
+
 from collections import Counter
+
 slot_counter = Counter()
 for v in volunteer_data:
     slots = [s.strip() for s in v["你可以参加的面试时间"].split("、")]
     for s in slots:
         slot_counter[s] += 1
 
-# 统计各时间段面试官人数
-interviewer_slots = {}
-for slot, names in {"周六上午": ["张明", "李华", "杨帆"], "周六下午": ["王芳", "李华", "赵强"], "周日上午": ["刘洋", "陈静", "赵强", "杨帆"]}.items():
-    interviewer_slots[slot] = len(names)
-
-for slot in sorted(slot_counter.keys()):
-    print(f"  {slot}: {interviewer_slots.get(slot, 0)} 名面试官, {slot_counter[slot]} 名可选志愿者")
+for slot in time_slot_list:
+    n_interviewers = len([x for x in interviewer_columns[slot] if x is not None])
+    print(f"  {slot}: {n_interviewers} 名面试官, {slot_counter[slot]} 名可选志愿者")

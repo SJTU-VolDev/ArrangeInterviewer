@@ -38,6 +38,8 @@ class OutputGenerator:
         time_slots: List[str],
         key_words: List[str],
         log_messages: List[str],
+        has_sub_slots: bool = False,
+        has_numbering: bool = False,
     ):
         """
         Args:
@@ -45,11 +47,15 @@ class OutputGenerator:
             time_slots: 按配置顺序排列的时间段列表
             key_words: 志愿者关键字段名列表（如 ["姓名", "学号", "微信号"]）
             log_messages: 日志消息列表
+            has_sub_slots: 是否启用了分时段
+            has_numbering: 是否启用了编号
         """
         self.assignments = assignments
         self.time_slots = time_slots
         self.key_words = key_words
         self.log_messages = log_messages
+        self.has_sub_slots = has_sub_slots
+        self.has_numbering = has_numbering
 
     # ------------------------------------------------------------------
     # Excel 输出
@@ -61,20 +67,30 @@ class OutputGenerator:
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
 
+        # 确定列顺序：时间段, 面试官, [小时间段], [编号], key_words...
+        columns = ["时间段", "面试官"]
+        if self.has_sub_slots:
+            columns.append("小时间段")
+        if self.has_numbering:
+            columns.append("编号")
+        columns.extend(self.key_words)
+
         # 构建行数据
         rows = []
         for a in self.assignments:
             row = {"时间段": a.time_slot, "面试官": a.interviewer}
+            if self.has_sub_slots:
+                row["小时间段"] = a.sub_slot
+            if self.has_numbering:
+                row["编号"] = a.number
             for kw in self.key_words:
                 value = a.volunteer.info.get(kw, "")
                 row[kw] = str(value) if value else ""
             rows.append(row)
 
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(rows, columns=columns)
 
         if df.empty:
-            # 无分配结果时输出空表
-            columns = ["时间段", "面试官"] + self.key_words
             df = pd.DataFrame(columns=columns)
 
         # 按时间段配置顺序 + 面试官名称排序
@@ -96,6 +112,13 @@ class OutputGenerator:
 
         if max_col == 0:
             return
+
+        # 建立列名→列号映射（1-based）
+        col_index = {name: i + 1 for i, name in enumerate(df.columns)}
+        time_col = col_index["时间段"]
+        interviewer_col = col_index["面试官"]
+        sub_slot_col = col_index.get("小时间段")
+        numbering_col = col_index.get("编号")
 
         # 颜色映射
         color_map = {
@@ -121,14 +144,14 @@ class OutputGenerator:
 
         # 学号列文本格式
         student_id_col = None
-        for i, col_name in enumerate(df.columns):
+        for col_name, col_idx in col_index.items():
             if "学号" in str(col_name):
-                student_id_col = i + 1
+                student_id_col = col_idx
                 break
 
         # 数据行格式与背景色
         for row_idx in range(2, max_row + 1):
-            time_value = ws.cell(row=row_idx, column=1).value
+            time_value = ws.cell(row=row_idx, column=time_col).value
             fill_color = color_map.get(time_value)
             fill = (
                 PatternFill(
@@ -147,18 +170,39 @@ class OutputGenerator:
                 if student_id_col and col_idx == student_id_col:
                     cell.number_format = "@"
 
-        # 先合并面试官列（第2列，在同一时间段内），再合并时间段列
-        # 顺序不可颠倒：合并第1列后其非首行值变为None，会破坏分组判断
-        self._merge_same_values_grouped(ws, group_col=1, merge_col=2, start_row=2, end_row=max_row)
-        self._merge_same_values(ws, col=1, start_row=2, end_row=max_row)
+        # 合并单元格（从内层到外层，避免读取已合并的 None 值）
+        # 1. 如果有小时间段列：在同一（时间段+面试官）分组内合并连续相同小时间段
+        if sub_slot_col:
+            self._merge_grouped_by_multi(
+                ws,
+                group_cols=[time_col, interviewer_col],
+                merge_col=sub_slot_col,
+                start_row=2,
+                end_row=max_row,
+            )
+        # 2. 合并面试官列（在同一时间段内）
+        self._merge_same_values_grouped(
+            ws, group_col=time_col, merge_col=interviewer_col,
+            start_row=2, end_row=max_row,
+        )
+        # 3. 合并时间段列
+        self._merge_same_values(ws, col=time_col, start_row=2, end_row=max_row)
 
         # 列宽
-        ws.column_dimensions["A"].width = 22  # 时间段
-        ws.column_dimensions["B"].width = 12  # 面试官
-        col_letters = "CDEFGHIJKLMNOP"
-        for i, kw in enumerate(self.key_words):
-            if i < len(col_letters):
-                ws.column_dimensions[col_letters[i]].width = 15
+        from openpyxl.utils import get_column_letter
+
+        col_widths = {
+            "时间段": 22,
+            "面试官": 12,
+            "小时间段": 15,
+            "编号": 8,
+        }
+        for col_name, col_idx in col_index.items():
+            letter = get_column_letter(col_idx)
+            if col_name in col_widths:
+                ws.column_dimensions[letter].width = col_widths[col_name]
+            else:
+                ws.column_dimensions[letter].width = 15
 
     @staticmethod
     def _merge_same_values(ws, col: int, start_row: int, end_row: int) -> None:
@@ -203,6 +247,48 @@ class OutputGenerator:
             m_val = ws.cell(row=row, column=merge_col).value
 
             # 分组变化或合并列值变化
+            if g_val != group_val or m_val != merge_val:
+                if merge_start < row - 1:
+                    ws.merge_cells(
+                        start_row=merge_start, start_column=merge_col,
+                        end_row=row - 1, end_column=merge_col,
+                    )
+                group_val = g_val
+                merge_val = m_val
+                merge_start = row
+
+        if merge_start < end_row:
+            ws.merge_cells(
+                start_row=merge_start, start_column=merge_col,
+                end_row=end_row, end_column=merge_col,
+            )
+
+    @staticmethod
+    def _merge_grouped_by_multi(
+        ws,
+        group_cols: List[int],
+        merge_col: int,
+        start_row: int,
+        end_row: int,
+    ) -> None:
+        """在多个分组列值均相同的范围内，合并目标列的连续相同值。
+
+        例如 group_cols=[1,2] 表示时间段+面试官都相同时才视为同组。
+        """
+        if start_row > end_row:
+            return
+
+        def _group_key(row: int):
+            return tuple(ws.cell(row=row, column=c).value for c in group_cols)
+
+        group_val = _group_key(start_row)
+        merge_val = ws.cell(row=start_row, column=merge_col).value
+        merge_start = start_row
+
+        for row in range(start_row + 1, end_row + 1):
+            g_val = _group_key(row)
+            m_val = ws.cell(row=row, column=merge_col).value
+
             if g_val != group_val or m_val != merge_val:
                 if merge_start < row - 1:
                     ws.merge_cells(
