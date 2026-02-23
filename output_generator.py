@@ -82,10 +82,15 @@ class OutputGenerator:
             if self.has_sub_slots:
                 row["小时间段"] = a.sub_slot
             if self.has_numbering:
-                row["编号"] = a.number
-            for kw in self.key_words:
-                value = a.volunteer.info.get(kw, "")
-                row[kw] = str(value) if value else ""
+                row["编号"] = a.number if not a.is_placeholder else ""
+            if a.is_placeholder:
+                # 空置占位行：志愿者字段留空
+                for kw in self.key_words:
+                    row[kw] = ""
+            else:
+                for kw in self.key_words:
+                    value = a.volunteer.info.get(kw, "")
+                    row[kw] = str(value) if value else ""
             rows.append(row)
 
         df = pd.DataFrame(rows, columns=columns)

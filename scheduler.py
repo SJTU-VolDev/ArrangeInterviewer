@@ -17,7 +17,7 @@ from volunteer_parser import Volunteer
 class Assignment:
     """表示一条分配结果：志愿者 → 时间段 + 面试官"""
 
-    def __init__(self, volunteer: Volunteer, time_slot: str, interviewer: str):
+    def __init__(self, volunteer: Optional[Volunteer], time_slot: str, interviewer: str):
         self.volunteer = volunteer
         self.time_slot = time_slot
         self.interviewer = interviewer
@@ -25,9 +25,15 @@ class Assignment:
         self.sub_slot: str = ""      # 小时间段（如 "14:00-14:15"）
         self.number: int = 0         # 编号（同面试官下从1开始）
 
+    @property
+    def is_placeholder(self) -> bool:
+        """是否为空置占位行（无志愿者）"""
+        return self.volunteer is None
+
     def __repr__(self) -> str:
+        name = self.volunteer.name if self.volunteer else "(空)"
         return (
-            f"Assignment({self.volunteer.name} → "
+            f"Assignment({name} → "
             f"{self.time_slot} / {self.interviewer})"
         )
 

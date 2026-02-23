@@ -3,7 +3,8 @@ post_processor.py
 后处理模块
 
 对分配结果进行二次处理：
-    - 分时段：将大时间段按 n 分钟切分为小时间段，志愿者等分
+    - 分时段（均分策略）：将大时间段按 n 分钟切分为小时间段，志愿者等分
+    - 分时段（头部聚集策略）：优先填满最早的小时间段，奇偶位有不同上限
     - 编号：为每个面试官下的志愿者从 1 开始编号
 """
 
@@ -125,6 +126,122 @@ def apply_sub_slots(
     assignments.extend(reordered)
 
 
+def apply_sub_slots_head_gather(
+    assignments: List[Assignment],
+    sub_slot_minutes: int,
+    odd_max: int,
+    even_max: int,
+    log_messages: List[str],
+) -> None:
+    """头部聚集策略：优先填满最早的小时间段，然后依次向后填充。
+
+    奇数位小时间段（第1、3、5…个）最多放 odd_max 人，
+    偶数位小时间段（第2、4、6…个）最多放 even_max 人。
+    若所有小时间段填满后仍有志愿者未分配，输出错误信息。
+
+    Args:
+        assignments: 分配结果列表（就地修改）
+        sub_slot_minutes: 每个小时间段的分钟数
+        odd_max: 奇数位小时间段的最大人数
+        even_max: 偶数位小时间段的最大人数
+        log_messages: 日志消息列表
+    """
+    log_messages.append(
+        f"\n=== 后处理：头部聚集分时段（每 {sub_slot_minutes} 分钟, "
+        f"奇数位上限 {odd_max}, 偶数位上限 {even_max}）==="
+    )
+
+    # 按 (time_slot, interviewer) 分组，保持原有顺序
+    groups: defaultdict[Tuple[str, str], List[Assignment]] = defaultdict(list)
+    for a in assignments:
+        groups[(a.time_slot, a.interviewer)].append(a)
+
+    # 缓存每个时间段的小时间段列表
+    sub_slot_cache: dict[str, List[str]] = {}
+
+    # 用于重排 assignments 列表：按小时间段聚拢
+    reordered: List[Assignment] = []
+
+    has_error = False
+
+    for (slot, interviewer), group in groups.items():
+        if slot not in sub_slot_cache:
+            time_range = _parse_time_range(slot)
+            if time_range is None:
+                log_messages.append(
+                    f"  警告: 无法从时间段 \"{slot}\" 中解析 HH:MM-HH:MM，跳过分时段"
+                )
+                sub_slot_cache[slot] = []
+            else:
+                sub_slot_cache[slot] = _generate_sub_slots(
+                    time_range[0], time_range[1], sub_slot_minutes
+                )
+
+        sub_slots = sub_slot_cache[slot]
+        if not sub_slots:
+            reordered.extend(group)
+            continue
+
+        n_subs = len(sub_slots)
+        n_vols = len(group)
+
+        # 计算总容量
+        total_capacity = 0
+        for sub_idx in range(n_subs):
+            cap = odd_max if (sub_idx % 2 == 0) else even_max  # 第1个=index 0=奇数位
+            total_capacity += cap
+
+        # 容量校验
+        if n_vols > total_capacity:
+            error_msg = (
+                f"错误: 时间段 '{slot}' 面试官 '{interviewer}' 名额不足 "
+                f"(需分配 {n_vols} 人, 总容量 {total_capacity} 人)"
+            )
+            log_messages.append(f"  {error_msg}")
+            print(error_msg)
+            has_error = True
+            # 仍然尽力分配（填满所有小时间段）
+
+        # 从第1个小时间段开始，按顺序填充
+        vol_idx = 0
+        for sub_idx, sub_slot_name in enumerate(sub_slots):
+            # 奇数位 = index 0, 2, 4, ... ; 偶数位 = index 1, 3, 5, ...
+            cap = odd_max if (sub_idx % 2 == 0) else even_max
+            filled = 0
+            while filled < cap and vol_idx < n_vols:
+                group[vol_idx].sub_slot = sub_slot_name
+                reordered.append(group[vol_idx])
+                vol_idx += 1
+                filled += 1
+
+            if vol_idx >= n_vols:
+                # 所有志愿者已分配完毕，为后续空置小时间段生成占位行
+                for empty_idx in range(sub_idx + (1 if filled > 0 else 0), n_subs):
+                    placeholder = Assignment(
+                        volunteer=None,
+                        time_slot=slot,
+                        interviewer=interviewer,
+                    )
+                    placeholder.sub_slot = sub_slots[empty_idx]
+                    reordered.append(placeholder)
+                break  # 退出小时间段循环
+
+        log_messages.append(
+            f"  {slot} / {interviewer}: "
+            f"{n_vols} 名志愿者 → {n_subs} 个小时间段 "
+            f"(总容量 {total_capacity}, 已用 {min(n_vols, total_capacity)})"
+        )
+
+    if has_error:
+        log_messages.append(
+            "\n警告: 存在面试官名额不足的情况，请检查上述错误信息"
+        )
+
+    # 用重排后的列表替换原 assignments
+    assignments.clear()
+    assignments.extend(reordered)
+
+
 def apply_numbering(
     assignments: List[Assignment],
     log_messages: List[str],
@@ -140,5 +257,10 @@ def apply_numbering(
         groups[(a.time_slot, a.interviewer)].append(a)
 
     for (slot, interviewer), group in groups.items():
-        for idx, a in enumerate(group):
-            a.number = idx + 1
+        num = 1
+        for a in group:
+            if a.is_placeholder:
+                a.number = 0  # 占位行不编号
+            else:
+                a.number = num
+                num += 1

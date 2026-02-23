@@ -17,7 +17,7 @@ import sys
 from interviewer_parser import InterviewerParser
 from volunteer_parser import VolunteerParser
 from scheduler import Scheduler
-from post_processor import apply_sub_slots, apply_numbering
+from post_processor import apply_sub_slots, apply_sub_slots_head_gather, apply_numbering
 from output_generator import OutputGenerator
 
 
@@ -52,6 +52,9 @@ def main():
     interview_time_column = config.get("interview_time_column", "面试时间")
     sub_slot_minutes = config.get("sub_slot_minutes", False)
     enable_numbering = config.get("enable_numbering", False)
+    distribution_strategy = config.get("distribution_strategy", 1)
+    head_gather_odd_max = config.get("head_gather_odd_max", 3)
+    head_gather_even_max = config.get("head_gather_even_max", 2)
 
     # ---- 1. 解析面试官信息 ----
     if not os.path.exists(interviewer_file):
@@ -130,8 +133,20 @@ def main():
     has_numbering = bool(enable_numbering)
 
     if has_sub_slots:
-        print(f"\n执行后处理：分时段（每 {sub_slot_minutes} 分钟）...")
-        apply_sub_slots(scheduler.assignments, sub_slot_minutes, scheduler.log_messages)
+        if distribution_strategy == 2:
+            # 头部聚集策略
+            print(f"\n执行后处理：头部聚集分时段（每 {sub_slot_minutes} 分钟, 奇数位上限 {head_gather_odd_max}, 偶数位上限 {head_gather_even_max}）...")
+            apply_sub_slots_head_gather(
+                scheduler.assignments,
+                sub_slot_minutes,
+                head_gather_odd_max,
+                head_gather_even_max,
+                scheduler.log_messages,
+            )
+        else:
+            # 默认均分策略
+            print(f"\n执行后处理：均分分时段（每 {sub_slot_minutes} 分钟）...")
+            apply_sub_slots(scheduler.assignments, sub_slot_minutes, scheduler.log_messages)
 
     if has_numbering:
         print("执行后处理：编号...")
