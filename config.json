@@ -7,5 +7,6 @@
     "enable_numbering": true,
     "distribution_strategy": 2,
     "head_gather_odd_max": 3,
-    "head_gather_even_max": 2
+    "head_gather_even_max": 2,
+    "scheduling_mode": "interviewer"
 }

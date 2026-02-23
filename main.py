@@ -55,6 +55,7 @@ def main():
     distribution_strategy = config.get("distribution_strategy", 1)
     head_gather_odd_max = config.get("head_gather_odd_max", 3)
     head_gather_even_max = config.get("head_gather_even_max", 2)
+    scheduling_mode = config.get("scheduling_mode", "interviewer")
 
     # ---- 1. 解析面试官信息 ----
     if not os.path.exists(interviewer_file):
@@ -125,6 +126,7 @@ def main():
         slot_interviewers=slot_interviewers,
         volunteers=volunteers,
         slot_weights=slot_weights,
+        scheduling_mode=scheduling_mode,
     )
     scheduler.run()
 
